@@ -87,13 +87,14 @@ static inline bed_file_t *init_bed_file(char *file_path) {
   bed->fh = wzopen(bed->file_path);
   bed->targets = 0;
   bed->line = NULL;
+  bed->seqname = NULL;
   return bed;
 }
 
 static inline void free_bed_file(bed_file_t *bed) {
   wzclose(bed->fh);
   /* destroy_target_v(bed->targets); */
-  destroy_targets(bed->targets);
+  if (bed->targets) destroy_targets(bed->targets);
   free(bed->file_path);
   free(bed->line);
   free(bed->seqname);
@@ -109,7 +110,7 @@ static inline int bed_read1(bed_file_t *bed, bed1_t *b, parse_data_f parse_data)
   if (nfields < 3)
     wzfatal("[%s:%d] Bed file has fewer than 3 columns.\n", __func__, __LINE__);
 
-  if (strcmp(fields[0], bed->seqname) != 0) {
+  if (bed->seqname==NULL || strcmp(fields[0], bed->seqname) != 0) {
     free(bed->seqname); bed->seqname = strdup(fields[0]);
   }
   b->seqname = bed->seqname;

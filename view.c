@@ -44,6 +44,7 @@ static int usage() {
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "    -o        optional file output\n");
   fprintf(stderr, "    -g        REGION\n");
+  fprintf(stderr, "    -c        print column name\n");
   fprintf(stderr, "    -R        file listing the regions\n");
   fprintf(stderr, "    -h        This help\n");
   fprintf(stderr, "\n");
@@ -264,11 +265,13 @@ int main_view(int argc, char *argv[]) {
   char *regions_fname = NULL;
   char *region = NULL;
   FILE *out_fh = stdout;
-  while ((c = getopt(argc, argv, "o:R:g:h"))>=0) {
+  int column_name = 0;
+  while ((c = getopt(argc, argv, "o:R:g:ch"))>=0) {
     switch (c) {
     case 'o': out_fh = fopen(optarg, "w"); break;
     case 'R': regions_fname = optarg; break;
     case 'g': region = strdup(optarg); break;
+    case 'c': column_name = 1; break;
     case 'h': return usage(); break;
     default: usage(); wzfatal("Unrecognized option: %c.\n", c);
     }
@@ -287,6 +290,13 @@ int main_view(int argc, char *argv[]) {
   tbk_t *tbks = calloc(n_tbks, sizeof(tbk_t));
   int i;
   for(i=0; optind < argc; optind++, i++) tbks[i].fname = argv[optind];
+
+  if (column_name) {
+    fputs("seqname\tstart\tend", out_fh);
+    for(i=0; i<n_tbks; ++i) fprintf(out_fh, "\t%s", tbks[i].fname);
+    fputc('\n', out_fh);
+  }
+  
   regs = parse_regions(regions_fname, region, &nregs);
   int ret;
   ret = query_regions(bed4i_fname, regs, nregs, tbks, n_tbks, out_fh);
