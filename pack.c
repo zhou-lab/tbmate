@@ -147,7 +147,7 @@ int main_pack(int argc, char *argv[]) {
   char *tbk_path = argv[optind++];
     
   bed1_t *b = init_bed1(NULL, NULL);
-  b->tid = -1;
+  /* b->tid = -1; */
 
   char *bd;
 
@@ -162,8 +162,7 @@ int main_pack(int argc, char *argv[]) {
   while (bed_read1(bed, b, parse_data)) {
 
     if (bed4i) {
-      fprintf(bed4i, "%s\t%"PRId64"\t%"PRId64"\t%d\n",
-              get_target_v(bed->targets, b->tid).name, b->beg, b->end, n);
+      fprintf(bed4i, "%s\t%"PRId64"\t%"PRId64"\t%d\n", b->seqname, b->beg, b->end, n);
     }
     
     bd = (char*) b->data;

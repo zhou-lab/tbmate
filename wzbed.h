@@ -42,7 +42,8 @@
  ** Bed Record **
  ****************/
 typedef struct bed1_t {
-  int tid;
+  /* int tid; */
+  char *seqname;                /* points to bed_file_t.seqname, does not own! */
   int64_t beg;
   int64_t end;
   void *data;
@@ -75,23 +76,27 @@ typedef struct bed_file_t {
   char *file_path;
   gzFile fh;
   char *line;
-  target_v *targets;
+  char *seqname;
+  /* target_v *targets; */
+  targets_t *targets;
 } bed_file_t;
 
 static inline bed_file_t *init_bed_file(char *file_path) {
   bed_file_t *bed = calloc(1, sizeof(bed_file_t));
   bed->file_path = strdup(file_path);
   bed->fh = wzopen(bed->file_path);
-  bed->targets = init_target_v(2);
+  bed->targets = 0;
   bed->line = NULL;
   return bed;
 }
 
 static inline void free_bed_file(bed_file_t *bed) {
   wzclose(bed->fh);
-  destroy_target_v(bed->targets);
+  /* destroy_target_v(bed->targets); */
+  destroy_targets(bed->targets);
   free(bed->file_path);
   free(bed->line);
+  free(bed->seqname);
   free(bed);
 }
 
@@ -104,7 +109,12 @@ static inline int bed_read1(bed_file_t *bed, bed1_t *b, parse_data_f parse_data)
   if (nfields < 3)
     wzfatal("[%s:%d] Bed file has fewer than 3 columns.\n", __func__, __LINE__);
 
-  b->tid = locate_or_insert_target_v(bed->targets, fields[0]);
+  if (strcmp(fields[0], bed->seqname) != 0) {
+    free(bed->seqname); bed->seqname = strdup(fields[0]);
+  }
+  b->seqname = bed->seqname;
+  /* b->tid = get_tid(bed->targets, fields[0], 1); */
+  /* locate_or_insert_target_v(bed->targets, fields[0]); */
 
   ensure_number(fields[1]);
   b->beg = atoi(fields[1]);
