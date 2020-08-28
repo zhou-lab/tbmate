@@ -64,7 +64,7 @@ int is_integer(char **samples, int n_samples) {
 
 int is_float(char **samples, int n_samples) {
   int i, j;
-  for (j=0; i<n_samples; ++j) {
+  for (j=0; j<n_samples; ++j) {
     for (i=0;samples[j][i];++i) {
       if (!isdigit(samples[j][i]) &&
           samples[j][i] != '.' &&
@@ -75,8 +75,8 @@ int is_float(char **samples, int n_samples) {
 }
 
 data_type_t data_type(char **samples, int n_samples) {
-  if (is_integer(samples, n_samples)) return DT_INT32;
   if (is_float(samples, n_samples)) return DT_DOUBLE;
+  if (is_integer(samples, n_samples)) return DT_INT32;
   return DT_NA;
 }
 
@@ -138,22 +138,30 @@ int main_pack(int argc, char *argv[]) {
     }
   }
 
-  if (optind + 2 > argc) { 
+  if (optind + 1 > argc) { 
     usage(); 
-    wzfatal("Please supply reference file and sorted bed file.\n"); 
+    wzfatal("Please supply input file.\n"); 
   }
 
   bed_file_t *bed = init_bed_file(argv[optind++]);
-  char *tbk_path = argv[optind++];
+  FILE *tbk_out = NULL;
+  if (optind < argc) tbk_out = fopen(argv[optind++], "wb");
     
   bed1_t *b = init_bed1(NULL, NULL);
   /* b->tid = -1; */
 
   char *bd;
 
-  FILE *tbk_out = fopen(tbk_path, "wb");
   FILE *bed4i = NULL;
-  if (bed4i_path) bed4i = fopen(bed4i_path, "w");
+  if (bed4i_path) {
+    if (strcmp(bed4i_path, "stdout") == 0) {
+      bed4i = stdout;
+    } else if (strcmp(bed4i_path, "stderr") == 0) {
+      bed4i = stderr;
+    } else {
+      bed4i = fopen(bed4i_path, "w");
+    }
+  }
   
   int n = 0;
   char *samples[1000] = {0};
@@ -173,13 +181,13 @@ int main_pack(int argc, char *argv[]) {
 
     if (n == 1000) {
       if (dt == DT_NA) dt = data_type(samples, n);
-      fwrite(&dt, TBK_HEADER_SIZE, 1, tbk_out);
+      if (tbk_out) fwrite(&dt, TBK_HEADER_SIZE, 1, tbk_out);
       for(i=0; i<n; ++i) {
-        tbk_write(samples[i], dt, tbk_out, i, &aux);
+        if (tbk_out) tbk_write(samples[i], dt, tbk_out, i, &aux);
         free(samples[i]);
       }
     }
-    tbk_write(bd, dt, tbk_out, n, &aux);
+    if (tbk_out) tbk_write(bd, dt, tbk_out, n, &aux);
     free(bd);
     n++;
   }
@@ -187,14 +195,14 @@ int main_pack(int argc, char *argv[]) {
   /* if no more than 1000 records */
   if (n <= 1000) {
     if (dt == DT_NA) dt = data_type(samples, n);
-    fwrite(&dt, TBK_HEADER_SIZE, 1, tbk_out);
+    if (tbk_out) fwrite(&dt, TBK_HEADER_SIZE, 1, tbk_out);
     for(i=0; i<n; ++i) {
-      tbk_write(samples[i], dt, tbk_out, i, &aux);
+      if (tbk_out) tbk_write(samples[i], dt, tbk_out, i, &aux);
       free(samples[i]);
     }
   }
 
-  if (dt == DT_INT2) { fwrite(&aux, 1, 1, tbk_out); aux=0; }
+  if (dt == DT_INT2) { if (tbk_out) fwrite(&aux, 1, 1, tbk_out); aux=0; }
   
   free_bed1(b, NULL);
   free_bed_file(bed);
@@ -202,6 +210,6 @@ int main_pack(int argc, char *argv[]) {
     fclose(bed4i);
     free(bed4i_path);
   }
-  fclose(tbk_out);
+  if (tbk_out) fclose(tbk_out);
   return 0;
 }
