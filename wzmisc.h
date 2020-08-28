@@ -63,6 +63,19 @@ static inline void ensure_number(char *s) {
   }
 }
 
+/* allow negative */
+static inline void ensure_number2(char *s) {
+  int i;
+  for (i=0;s[i];++i) {
+    if (i==0 && s[0] == '-') continue;
+    if (!isdigit(s[i]) && s[i]!='.') {
+      fprintf(stderr, "[%s:%d] Trying to convert nondigit string to number: %s\n", __func__, __LINE__, s);
+      fflush(stderr);
+      exit(1);
+    }
+  }
+}
+
 static inline int strcount_char(char *s, char c) {
   int i, n=0;
   for (i=0; s[i]; ++i)

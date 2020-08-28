@@ -45,6 +45,7 @@ static int usage() {
   fprintf(stderr, "    -o        optional file output\n");
   fprintf(stderr, "    -g        REGION\n");
   fprintf(stderr, "    -c        print column name\n");
+  fprintf(stderr, "    -a        print all column in the index\n");
   fprintf(stderr, "    -R        file listing the regions\n");
   fprintf(stderr, "    -h        This help\n");
   fprintf(stderr, "\n");
@@ -135,6 +136,9 @@ void tbk_open(tbk_t *tbk) {
 }
 
 void tbk_query(tbk_t *tbk, int offset, FILE *out_fh) {
+
+  /* when the offset is unfound */
+  if (offset < 0) {fputs("\t-1", out_fh); return;}
   
   switch(tbk->dt) {
   case DT_INT2: {
@@ -207,7 +211,7 @@ void tbk_close(tbk_t *tbk) {
   memset(tbk, 0, sizeof(tbk_t));
 }
 
-static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n_tbks, FILE *out_fh) {
+static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n_tbks, int print_all, int column_name, FILE *out_fh) {
   int i;
   htsFile *fp = hts_open(fname,"r");
   if(!fp) error("Could not read %s\n", fname);
@@ -220,7 +224,8 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
   kstring_t str = {0,0,0};
   const char **seq = NULL;
   char **fields; int nfields;
-  int offset;
+  int offset, ii;
+  int linenum=0;
   for(i=0; i<nregs; i++) {
     hts_itr_t *itr = tbx_itr_querys(tbx, regs[i]);
     if(!itr) continue;
@@ -229,7 +234,25 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
       line_get_fields(str.s, "\t", &fields, &nfields);
       if (nfields < 3)
         wzfatal("[%s:%d] Bed file has fewer than 3 columns.\n", __func__, __LINE__);
-      ensure_number(fields[3]);
+
+      if (!linenum) {
+        if (column_name) {
+          fputs("seqname\tstart\tend", out_fh);
+          if (print_all) {
+            fputs("\toffset", out_fh);
+            for(ii=4; ii<nfields; ++ii)
+              fprintf(out_fh, "\tField_%d", ii+1);
+          }
+        
+          for(ii=0; ii<n_tbks; ++ii)
+            fprintf(out_fh, "\t%s", tbks[ii].fname);
+        
+          fputc('\n', out_fh);
+        }
+      }
+      linenum++;
+      
+      ensure_number2(fields[3]);
       offset = atoi(fields[3]);
 
       fputs(fields[0], out_fh);
@@ -237,6 +260,10 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
       fputs(fields[1], out_fh);
       fputc('\t', out_fh);
       fputs(fields[2], out_fh);
+      if (print_all) {
+        for(ii=3; ii<nfields; ++ii)
+          fprintf(out_fh, "\t%s", fields[ii]);
+      }
 
       for(k=0; k<n_tbks; ++k) tbk_query(&tbks[k], offset, out_fh);
       fputc('\n', out_fh);
@@ -266,12 +293,14 @@ int main_view(int argc, char *argv[]) {
   char *region = NULL;
   FILE *out_fh = stdout;
   int column_name = 0;
-  while ((c = getopt(argc, argv, "o:R:g:ch"))>=0) {
+  int print_all = 0;
+  while ((c = getopt(argc, argv, "o:R:g:cah"))>=0) {
     switch (c) {
     case 'o': out_fh = fopen(optarg, "w"); break;
     case 'R': regions_fname = optarg; break;
     case 'g': region = strdup(optarg); break;
     case 'c': column_name = 1; break;
+    case 'a': print_all = 1; break;
     case 'h': return usage(); break;
     default: usage(); wzfatal("Unrecognized option: %c.\n", c);
     }
@@ -291,15 +320,9 @@ int main_view(int argc, char *argv[]) {
   int i;
   for(i=0; optind < argc; optind++, i++) tbks[i].fname = argv[optind];
 
-  if (column_name) {
-    fputs("seqname\tstart\tend", out_fh);
-    for(i=0; i<n_tbks; ++i) fprintf(out_fh, "\t%s", tbks[i].fname);
-    fputc('\n', out_fh);
-  }
-  
   regs = parse_regions(regions_fname, region, &nregs);
   int ret;
-  ret = query_regions(bed4i_fname, regs, nregs, tbks, n_tbks, out_fh);
+  ret = query_regions(bed4i_fname, regs, nregs, tbks, n_tbks, print_all, column_name, out_fh);
   free(tbks);
   return ret;
 }

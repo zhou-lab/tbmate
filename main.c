@@ -28,8 +28,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-
-#define PACKAGE_VERSION "0.1.0"
+#include "tbmate.h"
 
 int main_pack(int argc, char *argv[]);
 int main_view(int argc, char *argv[]);

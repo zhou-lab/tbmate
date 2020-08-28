@@ -31,6 +31,7 @@
  tbk file format:
  first 4 bytes: data_type_t
  */
+#define PACKAGE_VERSION "0.2.0"
 
 typedef enum {
   DT_NA, DT_INT2, DT_INT32, DT_FLOAT,
