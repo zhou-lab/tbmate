@@ -82,7 +82,9 @@ tbk_data_addr <- function(tbk_fnames, idx_addr, hdr) {
 #' of the first sample.
 #' 
 #' @param fnames tbk_fnames
-#' @param idx_fname index file name
+#' @param idx_fname index file name. If not given, use the
+#' idx.gz in the same folder as tbk_fnames[1]. Assume all input is compatible with the
+#' same index file.
 #' @param probes probe names
 #' @param simplify reduce matrix to vector if only one sample is queried
 #' @param name.use.base use basename for sample name
@@ -209,29 +211,6 @@ tbk_pack <- function(data, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_
         } else {
             stop("Unrecognized data type.\n")
         }
-        ## curr_offset <- 0
-        ## tmp <- lapply(seq_along(idx_addr), function(offset) {
-        ##     ## idx_addr[i], write b1[i,1]
-        ##     if (offset != curr_offset) {
-        ##         seek(out_file, where = offset, origin='start')
-        ##         curr_offset <- offset
-        ##     }
-        ##     curr_offset <<- curr_offset + 1
-        ##     if (datatype == "ONES") {
-        ##         writeBin(as.integer(round((data[offset,k] + 1.0) * MAX_DOUBLE16)), out_file, 2);
-        ##     } else if (datatype == "FLOAT") {
-        ##         writeBin(as.numeric(data[offset,k]), out_file, 'numeric', 1, 4)
-        ##     } else if (datatype == "DOUBLE") {
-        ##         writeBin(out_file, 'numeric', 1, 8)
-        ##     } else if (datatype == "INT32") {
-        ##         writeBin(out_file, "integer", 1, 4)
-        ##     } else if (datatype == "INT2") { # FIXME
-        ##         writeBin(out_file, "integer", 1, 4)
-        ##     } else {
-        ##         stop("Unrecognized data type.\n")
-        ##     }
-        ## })
-        ## close(out_file)
     })
 }
 
