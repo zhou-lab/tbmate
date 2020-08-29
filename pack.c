@@ -37,7 +37,7 @@ void parse_data(bed1_t *b, char **fields, int nfields) {
 
 static int usage() {
   fprintf(stderr, "\n");
-  fprintf(stderr, "Usage: tbmate compress [options] <in.bed> <out.tbk>\n");
+  fprintf(stderr, "Usage: tbmate pack [options] <in.bed> <out.tbk>\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "    -s        int2, int32, int, float, double, ones ([-1,1] up to 3e-5 precision)\n");
