@@ -25,7 +25,6 @@
 **/
 
 #include <stdlib.h>
-#include <inttypes.h>
 #include <string.h>
 #include <zlib.h>
 #include "tbmate.h"
@@ -121,7 +120,8 @@ int main_pack(int argc, char *argv[]) {
   if (argc<2) return usage();
   data_type_t dt = DT_NA;
   char *bed4i_path = NULL;
-  while ((c = getopt(argc, argv, "s:x:h"))>=0) {
+  char msg[HDR_EXTRA] = {0};
+  while ((c = getopt(argc, argv, "s:x:m:h"))>=0) {
     switch (c) {
     case 's':
       if (strcmp(optarg, "int2") == 0) dt = DT_INT2;
@@ -133,14 +133,19 @@ int main_pack(int argc, char *argv[]) {
       else wzfatal("Unrecognized data type: %s.\n", optarg);
       break;
     case 'x': bed4i_path = strdup(optarg); break;
+    case 'm': {
+      if (strlen(optarg) > HDR_EXTRA - 1) wzfatal("Message cannot be over %d in length.", HDR_EXTRA);
+      strcpy(msg, optarg);
+      break;
+    }
     case 'h': return usage(); break;
     default: usage(); wzfatal("Unrecognized option: %c.\n", c);
     }
   }
 
-  if (optind + 1 > argc) { 
+  if (optind + 2 > argc) { 
     usage(); 
-    wzfatal("Please supply input file.\n"); 
+    wzfatal("Please supply input and output file.\n"); 
   }
 
   bed_file_t *bed = init_bed_file(argv[optind++]);
@@ -162,15 +167,15 @@ int main_pack(int argc, char *argv[]) {
       bed4i = fopen(bed4i_path, "w");
     }
   }
-  
-  int n = 0;
+
+  int64_t n = 0;
   char *samples[1000] = {0};
-  int i;
+  int64_t i;
   uint8_t aux;                  /* sub-byte encoding */
   while (bed_read1(bed, b, parse_data)) {
 
     if (bed4i) {
-      fprintf(bed4i, "%s\t%"PRId64"\t%"PRId64"\t%d\n", b->seqname, b->beg, b->end, n);
+      fprintf(bed4i, "%s\t%"PRId64"\t%"PRId64"\t%"PRId64"\n", b->seqname, b->beg, b->end, n);
     }
     
     bd = (char*) b->data;
@@ -181,7 +186,7 @@ int main_pack(int argc, char *argv[]) {
 
     if (n == 1000) {
       if (dt == DT_NA) dt = data_type(samples, n);
-      if (tbk_out) fwrite(&dt, TBK_HEADER_SIZE, 1, tbk_out);
+      if (tbk_out) tbk_write_hdr(1, dt, n, msg, tbk_out);
       for(i=0; i<n; ++i) {
         if (tbk_out) tbk_write(samples[i], dt, tbk_out, i, &aux);
         free(samples[i]);
@@ -195,7 +200,7 @@ int main_pack(int argc, char *argv[]) {
   /* if no more than 1000 records */
   if (n <= 1000) {
     if (dt == DT_NA) dt = data_type(samples, n);
-    if (tbk_out) fwrite(&dt, TBK_HEADER_SIZE, 1, tbk_out);
+    if (tbk_out) tbk_write_hdr(1, dt, n, msg, tbk_out);
     for(i=0; i<n; ++i) {
       if (tbk_out) tbk_write(samples[i], dt, tbk_out, i, &aux);
       free(samples[i]);
@@ -210,6 +215,12 @@ int main_pack(int argc, char *argv[]) {
     fclose(bed4i);
     free(bed4i_path);
   }
+
+  /* the actual size */
+  fseek(tbk_out, HDR_MAX_OFFSET0, SEEK_SET);
+  fwrite(&n,   HDR_MAX_OFFSET, 1, tbk_out);
+
   if (tbk_out) fclose(tbk_out);
+  
   return 0;
 }

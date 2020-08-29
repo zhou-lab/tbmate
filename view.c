@@ -24,11 +24,6 @@
  * 
 **/
 
-#include <stdio.h>
-#include <getopt.h>
-#include <stdlib.h>
-#include <string.h>
-#include <libgen.h>
 #include "tbmate.h"
 #include "wzmisc.h"
 #include "wzio.h"
@@ -38,7 +33,14 @@
 #include "htslib/htslib/regidx.h"
 #include "htslib/htslib/kstring.h"
 
-static int usage() {
+typedef struct view_conf_t {
+  int precision;
+  int column_name;
+  int print_all;
+  int dot_for_negative;
+} view_conf_t;
+
+static int usage(view_conf_t *conf) {
   fprintf(stderr, "\n");
   fprintf(stderr, "Usage: tbmate view [options] [.tbk [...]]\n");
   fprintf(stderr, "\n");
@@ -48,6 +50,7 @@ static int usage() {
   fprintf(stderr, "    -g        REGION\n");
   fprintf(stderr, "    -c        print column name\n");
   fprintf(stderr, "    -a        print all column in the index\n");
+  fprintf(stderr, "    -p        precision used to print float[%d]\n", conf->precision);
   fprintf(stderr, "    -R        file listing the regions\n");
   fprintf(stderr, "    -h        This help\n");
   fprintf(stderr, "\n");
@@ -122,32 +125,18 @@ static char **parse_regions(char *regions_fname, char *region, int *nregs) {
   return regs;
 }
 
-typedef struct tbk_t {
-  char *fname;
-  FILE *fh;
-  int offset;   /* offset in the number of units or byte if unit is sub-byte */
-  data_type_t dt;               /* data type */
-  uint8_t data;                 /* sub-byte data */
-} tbk_t;
-
-void tbk_open(tbk_t *tbk) {
-  tbk->fh = fopen(tbk->fname, "rb");
-  fread(&tbk->dt, 4, 1, tbk->fh);
-  /* fprintf(stderr, "%d", tbk->dt); */
-  tbk->offset = 0;
-}
-
-void tbk_query(tbk_t *tbk, int offset, FILE *out_fh) {
+void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh) {
 
   /* when the offset is unfound */
   if (offset < 0) {fputs("\t-1", out_fh); return;}
+  if (offset >= tbk->offset_max) {wzfatal("Error: query %d out of range. Wrong idx file?", offset);}
   
   switch(tbk->dt) {
   case DT_INT2: {
     if(tbk->offset == 0 || offset/4 != tbk->offset-1) { /* need to read? */
       if(offset/4 != tbk->offset) {                       /* need to seek? */
         tbk->offset = offset/4;
-        if(fseek(tbk->fh, offset/4+TBK_HEADER_SIZE, SEEK_SET))
+        if(fseek(tbk->fh, offset/4+HDR_TOTALBYTES, SEEK_SET))
           wzfatal("File %s cannot be seeked.\n", tbk->fname);
       }
       fread(&(tbk->data), 1, 1, tbk->fh); tbk->offset++;
@@ -157,7 +146,7 @@ void tbk_query(tbk_t *tbk, int offset, FILE *out_fh) {
   }
   case DT_INT32: {
     if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*4+TBK_HEADER_SIZE, SEEK_SET))
+      if(fseek(tbk->fh, offset*4+HDR_TOTALBYTES, SEEK_SET))
         wzfatal("File %s cannot be seeked.\n", tbk->fname);
       tbk->offset = offset;
     }
@@ -169,7 +158,7 @@ void tbk_query(tbk_t *tbk, int offset, FILE *out_fh) {
   }
   case DT_FLOAT: {
     if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*4+TBK_HEADER_SIZE, SEEK_SET))
+      if(fseek(tbk->fh, offset*4+HDR_TOTALBYTES, SEEK_SET))
         wzfatal("File %s cannot be seeked.\n", tbk->fname);
       tbk->offset = offset;
     }
@@ -181,20 +170,22 @@ void tbk_query(tbk_t *tbk, int offset, FILE *out_fh) {
   }
   case DT_ONES: {
     if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*2+TBK_HEADER_SIZE, SEEK_SET))
+      if(fseek(tbk->fh, offset*2+HDR_TOTALBYTES, SEEK_SET))
         wzfatal("File %s cannot be seeked.\n", tbk->fname);
       tbk->offset = offset;
     }
     
     uint16_t data;
     fread(&data, 2, 1, tbk->fh); tbk->offset++;
-    fprintf(out_fh, "\t%f", uint16_to_float(data));
+    float dataf = uint16_to_float(data);
+    if (conf->dot_for_negative && dataf < 0) fputs("\t.", out_fh);
+    else fprintf(out_fh, "\t%.*f", conf->precision, dataf);
     /* fprintf(out_fh, "\t%d", data); */
     break;
   }
   case DT_DOUBLE: {
     if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*8+TBK_HEADER_SIZE, SEEK_SET))
+      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
         wzfatal("File %s cannot be seeked.\n", tbk->fname);
       tbk->offset = offset;
     }
@@ -208,12 +199,7 @@ void tbk_query(tbk_t *tbk, int offset, FILE *out_fh) {
   }
 }
 
-void tbk_close(tbk_t *tbk) {
-  fclose(tbk->fh);
-  memset(tbk, 0, sizeof(tbk_t));
-}
-
-static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n_tbks, int print_all, int column_name, FILE *out_fh) {
+static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n_tbks, view_conf_t *conf, FILE *out_fh) {
   int i;
   htsFile *fp = hts_open(fname,"r");
   if(!fp) error("Could not read %s\n", fname);
@@ -238,9 +224,9 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
         wzfatal("[%s:%d] Bed file has fewer than 3 columns.\n", __func__, __LINE__);
 
       if (!linenum) {
-        if (column_name) {
+        if (conf->column_name) {
           fputs("seqname\tstart\tend", out_fh);
-          if (print_all) {
+          if (conf->print_all) {
             fputs("\toffset", out_fh);
             for(ii=4; ii<nfields; ++ii)
               fprintf(out_fh, "\tField_%d", ii+1);
@@ -262,12 +248,12 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
       fputs(fields[1], out_fh);
       fputc('\t', out_fh);
       fputs(fields[2], out_fh);
-      if (print_all) {
+      if (conf->print_all) {
         for(ii=3; ii<nfields; ++ii)
           fprintf(out_fh, "\t%s", fields[ii]);
       }
 
-      for(k=0; k<n_tbks; ++k) tbk_query(&tbks[k], offset, out_fh);
+      for(k=0; k<n_tbks; ++k) tbk_query(&tbks[k], offset, conf, out_fh);
       fputc('\n', out_fh);
       free_fields(fields, nfields);
     }
@@ -288,30 +274,36 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
 
 int main_view(int argc, char *argv[]) {
 
+  view_conf_t conf = {0};
+  conf.precision = 3;
+  conf.print_all = 0;
+  conf.column_name = 0;
+  conf.dot_for_negative = 0;
+  
   int c;
-  if (argc<2) return usage();
+  if (argc<2) return usage(&conf);
 
   char *regions_fname = NULL;
   char *region = NULL;
   FILE *out_fh = stdout;
-  int column_name = 0;
-  int print_all = 0;
   char *bed4i_fname = NULL;
-  while ((c = getopt(argc, argv, "i:o:R:g:cah"))>=0) {
+  while ((c = getopt(argc, argv, "i:o:R:p:g:cadh"))>=0) {
     switch (c) {
     case 'i': bed4i_fname = strdup(optarg); break;
     case 'o': out_fh = fopen(optarg, "w"); break;
     case 'R': regions_fname = optarg; break;
     case 'g': region = strdup(optarg); break;
-    case 'c': column_name = 1; break;
-    case 'a': print_all = 1; break;
-    case 'h': return usage(); break;
-    default: usage(); wzfatal("Unrecognized option: %c.\n", c);
+    case 'p': conf.precision = atoi(optarg); break;
+    case 'c': conf.column_name = 1; break;
+    case 'a': conf.print_all = 1; break;
+    case 'd': conf.dot_for_negative = 1; break;
+    case 'h': return usage(&conf); break;
+    default: usage(&conf); wzfatal("Unrecognized option: %c.\n", c);
     }
   }
 
   if (optind > argc) { 
-    usage(); 
+    usage(&conf); 
     wzfatal("Please supply tbk file.\n"); 
   }
 
@@ -334,7 +326,7 @@ int main_view(int argc, char *argv[]) {
 
   regs = parse_regions(regions_fname, region, &nregs);
   int ret;
-  ret = query_regions(bed4i_fname, regs, nregs, tbks, n_tbks, print_all, column_name, out_fh);
+  ret = query_regions(bed4i_fname, regs, nregs, tbks, n_tbks, &conf, out_fh);
   free(tbks);
   if (bed4i_fname) free(bed4i_fname);
   return ret;

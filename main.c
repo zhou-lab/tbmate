@@ -32,6 +32,7 @@
 
 int main_pack(int argc, char *argv[]);
 int main_view(int argc, char *argv[]);
+int main_header(int argc, char *argv[]);
 
 static int usage()
 {
@@ -43,6 +44,7 @@ static int usage()
   fprintf(stderr, "Command:\n");
   fprintf(stderr, "     pack         pack data to tbk\n");
   fprintf(stderr, "     view         view data stored in tbk\n");
+  fprintf(stderr, "     header       view data header in tbk\n");
   fprintf(stderr, "\n");
 
   return 1;
@@ -53,6 +55,7 @@ int main(int argc, char *argv[]) {
   if (argc < 2) return usage();
   if (strcmp(argv[1], "pack") == 0) ret = main_pack(argc-1, argv+1);
   else if (strcmp(argv[1], "view") == 0) ret = main_view(argc-1, argv+1);
+  else if (strcmp(argv[1], "header") == 0) ret = main_header(argc-1, argv+1);
   else {
     fprintf(stderr, "[main] unrecognized command '%s'\n", argv[1]);
     return 1;

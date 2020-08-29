@@ -27,19 +27,31 @@
 
 #include <stdint.h>
 #include <math.h>
+#include <stdio.h>
+#include <getopt.h>
+#include <stdlib.h>
+#include <string.h>
+#include <libgen.h>
+#include "wzmisc.h"
+#include <inttypes.h>
 
-/*
- tbk file format:
- first 4 bytes: data_type_t
- */
+
 #define PACKAGE_VERSION "0.2.0"
+
+/* tbk file header format: */
+#define HDR_ID         3        /* three letter "tbk" */
+#define HDR_VERSION    4
+#define HDR_DATA_TYPE  4
+#define HDR_MAX_OFFSET 8
+#define HDR_EXTRA      493      /* message */
+#define HDR_TOTALBYTES 512
+
+#define HDR_MAX_OFFSET0 (3+4+4) /* offset to max offset */
+#define MAX_DOUBLE16 ((1<<15)-2)
 
 typedef enum {
   DT_NA, DT_INT2, DT_INT32, DT_FLOAT,
   DT_DOUBLE, DT_ONES} data_type_t;
-
-#define TBK_HEADER_SIZE 4
-#define MAX_DOUBLE16 ((1<<15)-2)
 
 static inline float uint16_to_float(uint16_t i) {
   return ((float)i - MAX_DOUBLE16) / MAX_DOUBLE16;
@@ -47,6 +59,49 @@ static inline float uint16_to_float(uint16_t i) {
 
 static inline uint16_t float_to_uint16(float f) {
   return (uint16_t) roundf((f+1) * MAX_DOUBLE16);
+}
+
+typedef struct tbk_t {
+  char *fname;
+  FILE *fh;
+  int32_t version;
+  int64_t offset;   /* offset in the number of units or byte if unit is sub-byte */
+  int64_t offset_max;          /* offset < offset_max */
+  char extra[HDR_EXTRA];
+  data_type_t dt;               /* data type */
+  uint8_t data;                 /* sub-byte data */
+} tbk_t;
+
+static inline void tbk_open(tbk_t *tbk) {
+  tbk->fh = fopen(tbk->fname, "rb");
+
+  if (!tbk->fh) wzfatal("Cannot open %s to read.\n", tbk->fname);
+  
+  char id[3];
+  fread(id, HDR_ID, 1, tbk->fh);
+
+  if (id[0] != 't' || id[1] != 'b' || id[2] != 'k')
+    wzfatal("%s is not a valid tbk file.\n", tbk->fname);
+  
+  fread(&tbk->version, HDR_VERSION, 1, tbk->fh);
+  fread(&tbk->dt, HDR_DATA_TYPE, 1, tbk->fh);
+  fread(&tbk->offset_max, HDR_MAX_OFFSET, 1, tbk->fh);
+  fread(&tbk->extra, HDR_EXTRA, 1, tbk->fh);
+  tbk->offset = 0;
+}
+
+static inline void tbk_write_hdr(int32_t version, data_type_t dt, int64_t n, char *msg, FILE*tbk_out) {
+  char id[3] = {'t','b','k'};
+  fwrite(&id,      HDR_ID,         1, tbk_out);
+  fwrite(&version, HDR_VERSION, 1, tbk_out);
+  fwrite(&dt,      HDR_DATA_TYPE,  1, tbk_out);
+  fwrite(&n,       HDR_MAX_OFFSET, 1, tbk_out);
+  fwrite(msg,      HDR_EXTRA,      1, tbk_out);
+}
+
+static inline void tbk_close(tbk_t *tbk) {
+  fclose(tbk->fh);
+  memset(tbk, 0, sizeof(tbk_t));
 }
 
 #endif /* _TBMATE_H */
