@@ -24,6 +24,11 @@ tbk_hdr <- function(tbk_file) {
     ), class='tbk')
 }
 
+#' retrieve tbk headers
+#'
+#' @param tbk_fnames the tbk file names
+#' @return a list object of class tbk
+#' @export
 tbk_hdrs <- function(tbk_fnames) {
     lapply(tbk_fnames, function(tbk_fname) {
         tbk_file <- file(tbk_fname, "rb")
