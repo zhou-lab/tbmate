@@ -28,6 +28,7 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 #include "tbmate.h"
 #include "wzmisc.h"
 #include "wzio.h"
@@ -39,10 +40,11 @@
 
 static int usage() {
   fprintf(stderr, "\n");
-  fprintf(stderr, "Usage: tbmate view [options] <in.bed4i.gz> <out.tbk> [REGION [...]]\n");
+  fprintf(stderr, "Usage: tbmate view [options] [.tbk [...]]\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "    -o        optional file output\n");
+  fprintf(stderr, "    -i        index, if not given search for idx.gz and idx.gz.tbi in the folder containing the first tbk file.\n");
   fprintf(stderr, "    -g        REGION\n");
   fprintf(stderr, "    -c        print column name\n");
   fprintf(stderr, "    -a        print all column in the index\n");
@@ -294,8 +296,10 @@ int main_view(int argc, char *argv[]) {
   FILE *out_fh = stdout;
   int column_name = 0;
   int print_all = 0;
-  while ((c = getopt(argc, argv, "o:R:g:cah"))>=0) {
+  char *bed4i_fname = NULL;
+  while ((c = getopt(argc, argv, "i:o:R:g:cah"))>=0) {
     switch (c) {
+    case 'i': bed4i_fname = strdup(optarg); break;
     case 'o': out_fh = fopen(optarg, "w"); break;
     case 'R': regions_fname = optarg; break;
     case 'g': region = strdup(optarg); break;
@@ -306,24 +310,33 @@ int main_view(int argc, char *argv[]) {
     }
   }
 
-  if (optind + 1 > argc) { 
+  if (optind > argc) { 
     usage(); 
-    wzfatal("Please supply index file and tbk file.\n"); 
+    wzfatal("Please supply tbk file.\n"); 
   }
 
   int nregs = 0;
   char **regs = NULL;
 
-  char *bed4i_fname = argv[optind++];
   int n_tbks = argc - optind;
   tbk_t *tbks = calloc(n_tbks, sizeof(tbk_t));
   int i;
   for(i=0; optind < argc; optind++, i++) tbks[i].fname = argv[optind];
 
+  if (!bed4i_fname) {
+    char *tmp = strdup(tbks[0].fname);
+    char *dir = dirname(tmp);
+    bed4i_fname = calloc(strlen(dir) + 10, sizeof(char));
+    strcpy(bed4i_fname, dir);
+    strcat(bed4i_fname, "/idx.gz");
+    free(tmp);
+  }
+
   regs = parse_regions(regions_fname, region, &nregs);
   int ret;
   ret = query_regions(bed4i_fname, regs, nregs, tbks, n_tbks, print_all, column_name, out_fh);
   free(tbks);
+  if (bed4i_fname) free(bed4i_fname);
   return ret;
 }
 
