@@ -24,6 +24,7 @@
  * 
 **/
 
+#include <dirent.h>
 #include "tbmate.h"
 #include "wzmisc.h"
 #include "wzio.h"
@@ -38,6 +39,7 @@ typedef struct view_conf_t {
   int column_name;
   int print_all;
   int dot_for_negative;
+  int show_unaddressed;
 } view_conf_t;
 
 static int usage(view_conf_t *conf) {
@@ -52,7 +54,9 @@ static int usage(view_conf_t *conf) {
   fprintf(stderr, "    -g        REGION\n");
   fprintf(stderr, "    -c        print column name\n");
   fprintf(stderr, "    -a        print all column in the index\n");
+  fprintf(stderr, "    -d        using dot for negative values\n");
   fprintf(stderr, "    -p        precision used to print float[%d]\n", conf->precision);
+  fprintf(stderr, "    -u        show unaddressed (use -1)\n");
   fprintf(stderr, "    -R        file listing the regions\n");
   fprintf(stderr, "    -h        This help\n");
   fprintf(stderr, "\n");
@@ -128,7 +132,7 @@ static char **parse_regions(char *regions_fname, char *region, int *nregs) {
 void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh) {
 
   /* when the offset is unfound */
-  if (offset < 0) {fputs("\t-1", out_fh); return;}
+  if (offset < 0) { fputs("\t-1", out_fh); return; }
   if (offset >= tbk->offset_max) {wzfatal("Error: query %d out of range. Wrong idx file?", offset);}
   
   switch(tbk->dt) {
@@ -153,7 +157,8 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh) {
     
     int data;
     fread(&data, 4, 1, tbk->fh); tbk->offset++;
-    fprintf(out_fh, "\t%d", data);
+    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
+    else fprintf(out_fh, "\t%d", data);
     break;
   }
   case DT_FLOAT: {
@@ -165,7 +170,8 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh) {
     
     float data;
     fread(&data, 4, 1, tbk->fh); tbk->offset++;
-    fprintf(out_fh, "\t%f", data);
+    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
+    else fprintf(out_fh, "\t%f", data);
     break;
   }
   case DT_ONES: {
@@ -192,7 +198,8 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh) {
     
     float data;
     fread(&data, 8, 1, tbk->fh); tbk->offset++;
-    fprintf(out_fh, "\t%f", data);
+    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
+    else fprintf(out_fh, "\t%f", data);
     break;
   }
   default: wzfatal("Unrecognized data type: %d.\n", tbk->dt);
@@ -243,18 +250,20 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
       ensure_number2(fields[3]);
       offset = atoi(fields[3]);
 
-      fputs(fields[0], out_fh);
-      fputc('\t', out_fh);
-      fputs(fields[1], out_fh);
-      fputc('\t', out_fh);
-      fputs(fields[2], out_fh);
-      if (conf->print_all) {
-        for(ii=3; ii<nfields; ++ii)
-          fprintf(out_fh, "\t%s", fields[ii]);
-      }
+      if (offset >= 0 || conf->show_unaddressed) {
+        fputs(fields[0], out_fh);
+        fputc('\t', out_fh);
+        fputs(fields[1], out_fh);
+        fputc('\t', out_fh);
+        fputs(fields[2], out_fh);
+        if (conf->print_all) {
+          for(ii=3; ii<nfields; ++ii)
+            fprintf(out_fh, "\t%s", fields[ii]);
+        }
 
-      for(k=0; k<n_tbks; ++k) tbk_query(&tbks[k], offset, conf, out_fh);
-      fputc('\n', out_fh);
+        for(k=0; k<n_tbks; ++k) tbk_query(&tbks[k], offset, conf, out_fh);
+        fputc('\n', out_fh);
+      }
       free_fields(fields, nfields);
     }
     tbx_itr_destroy(itr);
@@ -279,6 +288,7 @@ int main_view(int argc, char *argv[]) {
   conf.print_all = 0;
   conf.column_name = 0;
   conf.dot_for_negative = 0;
+  conf.show_unaddressed = 0;
   
   int c;
   if (argc<2) return usage(&conf);
@@ -287,7 +297,7 @@ int main_view(int argc, char *argv[]) {
   char *region = NULL;
   FILE *out_fh = stdout;
   char *bed4i_fname = NULL;
-  while ((c = getopt(argc, argv, "i:o:R:p:g:cadh"))>=0) {
+  while ((c = getopt(argc, argv, "i:o:R:p:g:caduh"))>=0) {
     switch (c) {
     case 'i': bed4i_fname = strdup(optarg); break;
     case 'o': out_fh = fopen(optarg, "w"); break;
@@ -297,6 +307,7 @@ int main_view(int argc, char *argv[]) {
     case 'c': conf.column_name = 1; break;
     case 'a': conf.print_all = 1; break;
     case 'd': conf.dot_for_negative = 1; break;
+    case 'u': conf.show_unaddressed = 1; break;
     case 'h': return usage(&conf); break;
     default: usage(&conf); wzfatal("Unrecognized option: %c.\n", c);
     }
@@ -310,10 +321,30 @@ int main_view(int argc, char *argv[]) {
   int nregs = 0;
   char **regs = NULL;
 
-  int n_tbks = argc - optind;
-  tbk_t *tbks = calloc(n_tbks, sizeof(tbk_t));
+  int n_tbks = 0; // = argc - optind;
+  tbk_t *tbks = NULL; // calloc(n_tbks, sizeof(tbk_t));
   int i;
-  for(i=0; optind < argc; optind++, i++) tbks[i].fname = argv[optind];
+  struct dirent *dir;
+  for(i=0; optind < argc; optind++, i++) {
+    /* if it's a directory then list all the .tbk files underneath */
+    DIR* d = opendir(argv[optind]);
+    if (d) { /* Directory exists. */
+      while ((dir = readdir(d)) != NULL) {
+        if (strlen(dir->d_name) > 4 && strcmp(dir->d_name + strlen(dir->d_name) - 4, ".tbk")==0) {
+          tbks = realloc(tbks, (n_tbks+1)*sizeof(tbk_t));
+          tbks[n_tbks].fname = malloc(strlen(argv[optind]) + strlen(dir->d_name) + 5);
+          strcpy(tbks[n_tbks].fname, argv[optind]);
+          strcat(tbks[n_tbks].fname, "/");
+          strcat(tbks[n_tbks].fname, dir->d_name);
+          n_tbks++;
+        }
+      }
+      closedir(d);
+    } else {
+      tbks = realloc(tbks, (n_tbks+1)*sizeof(tbk_t));
+      tbks[n_tbks++].fname = strdup(argv[optind]);
+    }
+  }
 
   if (!bed4i_fname) {
     char *tmp = strdup(tbks[0].fname);
@@ -327,6 +358,7 @@ int main_view(int argc, char *argv[]) {
   regs = parse_regions(regions_fname, region, &nregs);
   int ret;
   ret = query_regions(bed4i_fname, regs, nregs, tbks, n_tbks, &conf, out_fh);
+  if (n_tbks > 0) {for (i=0; i<n_tbks; ++i) free(tbks[i].fname);}
   free(tbks);
   if (bed4i_fname) free(bed4i_fname);
   return ret;
