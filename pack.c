@@ -40,7 +40,6 @@ static int usage() {
   fprintf(stderr, "Usage: tbmate compress [options] <in.bed> <out.tbk>\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Options:\n");
-  /* fprintf(stderr, "    -s        number of bytes for each record. Will be inferred if not give.\n"); */
   fprintf(stderr, "    -s        int2, int32, int, float, double, ones ([-1,1] up to 3e-5 precision)\n");
   fprintf(stderr, "    -x        optional output of a .bed4i file containing address for each record.\n");
   fprintf(stderr, "    -h        This help\n");
