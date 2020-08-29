@@ -26,6 +26,7 @@
 #define _TBMATE_H
 
 #include <stdint.h>
+#include <math.h>
 
 /*
  tbk file format:
@@ -45,7 +46,7 @@ static inline float uint16_to_float(uint16_t i) {
 }
 
 static inline uint16_t float_to_uint16(float f) {
-  return (uint16_t) ((f+1) * MAX_DOUBLE16);
+  return (uint16_t) roundf((f+1) * MAX_DOUBLE16);
 }
 
 #endif /* _TBMATE_H */
