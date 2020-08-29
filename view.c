@@ -46,15 +46,13 @@ static int usage(view_conf_t *conf) {
   fprintf(stderr, "\n");
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "    -o        optional file output\n");
-  fprintf(stderr, "    -i        index, if not given search for idx.gz and idx.gz.tbi in the folder containing the first tbk file.\n");
+  fprintf(stderr, "    -i        index, a tabix-ed bed file. Column 4 is the .tbk offset. if not given search for idx.gz and idx.gz.tbi in the folder containing the first tbk file.\n");
   fprintf(stderr, "    -g        REGION\n");
   fprintf(stderr, "    -c        print column name\n");
   fprintf(stderr, "    -a        print all column in the index\n");
   fprintf(stderr, "    -p        precision used to print float[%d]\n", conf->precision);
   fprintf(stderr, "    -R        file listing the regions\n");
   fprintf(stderr, "    -h        This help\n");
-  fprintf(stderr, "\n");
-  fprintf(stderr, "Note, in.bed4i.gz is a tabix-ed bed file. Column 4 is the .tbk offset.\n");
   fprintf(stderr, "\n");
 
   return 1;
