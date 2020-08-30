@@ -65,33 +65,6 @@ Options:
     -h        This help
 ```
 
-### index file
-
-The index file is a tabix-ed bed/bed.gz file. The fourth column contains the offset in the tbk file. There can be more columns for storing additional information (e.g., the array ID).
-
-### tbk file
-
-tbk file is a binary file. The first three bytes have to be "tbk" and will be validated by tbmate. The first 512 bytes store the data header:
-
-1. 3 bytes: "tbk"
-2. 4 bytes: version, currently 1
-3. 4 bytes: data type, enum {NA, INT2, INT32, FLOAT, DOUBLE, ONES}
-4. 8 bytes: number of values in the data
-5. 493 bytes: extra space, currently used for message
-
-```
-tbmate header input.tbk
-```
-
-The header subcommand will output the header inforamtion
-
-Currently tbmate supports the following data types
-1. INT2: 2 bits
-2. INT32: 4 bytes
-3. FLOAT: 4 bytes
-4. DOUBLE: 8 bytes
-5. ONES: 2 bytes, low precision (3e-5) storage for [-1,1] real number.
-
 ### View .tbk files
 
 ```
@@ -116,3 +89,73 @@ Options:
     -u        show unaddressed (use -1)
     -R        file listing the regions
 ```
+
+### The index files
+
+The index file is a tabix-ed bed/bed.gz file. The 4-th column contains the offset in the tbk file. There can be more columns for storing additional information (e.g., the array ID). The index file for data generated on the same coordinate system (the native address file) should just have a trivial enumerating 4-th column, i.e.,
+
+````
+chr1    10468   10470   0
+chr1    10470   10472   1
+chr1    10483   10485   2
+chr1    10488   10490   3
+chr1    10492   10494   4
+chr1    10496   10498   5
+````
+
+or if it's array (the 2nd and 3rd columns are not used).
+
+```
+cg00000029      1       2       0
+cg00000103      1       2       1
+cg00000109      1       2       2
+cg00000155      1       2       3
+cg00000158      1       2       4
+cg00000165      1       2       5
+```
+
+The cross-coordinate index will have a more scrambled addresses. For example, hg38_to_EPIC.idx.gz has
+
+```
+cg00000029   1   2   9719014    chr16:53434199-53434201
+cg00000103   1   2   19704158   chr4:72604468-72604470
+cg00000109   1   2   18796088   chr3:172198246-172198248
+cg00000155   1   2   23714121   chr7:2550930-2550932
+cg00000158   1   2   27254375   chr9:92248272-92248274
+```
+
+and EPIC_to_hg38.idx.gz has
+
+```
+chr1   10468   10470   -1   .
+chr1   10470   10472   -1   .
+chr1   10483   10485   -1   .
+...
+chr1    69590   69592   699401  cg21870274
+...
+```
+
+Note most entries have -1s which indicate no Infinium EPIC array ID is spotted. `tbmate view -d` can optionally omit these in the display. All index files can be easily generated from the native address file.
+
+### The tbk files
+
+tbk file is a binary file. The first three bytes have to be "tbk" and will be validated by tbmate. The first 512 bytes store the data header:
+
+1. 3 bytes: "tbk"
+2. 4 bytes: version, currently 1
+3. 4 bytes: data type, enum {NA, INT2, INT32, FLOAT, DOUBLE, ONES}
+4. 8 bytes: number of values in the data
+5. 493 bytes: extra space, currently used for message
+
+```
+tbmate header input.tbk
+```
+
+The header subcommand will output the header inforamtion
+
+Currently tbmate supports the following data types
+1. INT2: 2 bits
+2. INT32: 4 bytes
+3. FLOAT: 4 bytes
+4. DOUBLE: 8 bytes
+5. ONES: 2 bytes, low precision (3e-5) storage for [-1,1] real number.
