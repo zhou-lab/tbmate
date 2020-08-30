@@ -21,9 +21,22 @@ tbmate is currently implemented in C and R. It can easily be extended to other p
 
 Each sample is stored in a file. Data sets can be easily assembled by selecting files.
 
+By array ID
 ![random access1](docs/clip1.gif)
 
+By genomic coordinates
 ![random access2](docs/clip2.gif)
 
 ## Switch coordinate without copying data.
 
+array to genomic coordinates
+
+![coordinate switch1](docs/clip3.gif)
+
+genomic coordinates to array
+
+![coordinate switch2](docs/clip4.gif)
+
+One genome assembly to another
+
+![coordinate switch2](docs/clip5.gif)
