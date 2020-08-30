@@ -17,11 +17,13 @@ tbmate is meant to solve/alleviate these challenges by de-coupling the data from
 
 tbmate is currently implemented in C and R. It can easily be extended to other programming languages.
 
-## "Column operation" by file selection.
+## "Column-wise operation" by file selection.
 
 Each sample is stored in a file. Data sets can be easily assembled by selecting files.
 
-![Test Image 6](docs/clip1.gif)
+![random access1](docs/clip1.gif)
 
-## "Coordinate switch" without data copy.
+![random access2](docs/clip2.gif)
+
+## Switch coordinate without copying data.
 
