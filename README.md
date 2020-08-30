@@ -21,7 +21,7 @@ tbmate is currently implemented in C and R. It can easily be extended to other p
 
 Each sample is stored in a file. Data sets can be easily assembled by selecting files.
 
-By array ID
+Here is an example of Infinium EPIC array, stored and accessed by array ID
 
 ![random access1](docs/clip1.gif)
 
