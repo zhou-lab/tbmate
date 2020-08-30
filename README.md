@@ -25,25 +25,27 @@ Here is an example of Infinium EPIC array, stored and accessed by array ID
 
 ![random access1](docs/clip1.gif)
 
-By genomic coordinates
+Here is another example of Whole Genome Bisulfite Sequencing Data, stored and accessed by genomic coordinates.
 
 ![random access2](docs/clip2.gif)
 
 ## Switch coordinate without copying data.
 
-It is cumbersome to keep another copy of data after changing genome assembly. This can be even more storage consuming when one need to re-format array data to be co-analyzed by genome-wide data. tbmate can read a re-arranged address file so that data is used under the new coordinate system withot actual data re-storage. For example, one can use array data with a genomic coordinate so that it is used as a whole genome data. Here are the demo of how:
+It is cumbersome to keep another copy of data after changing genome assembly. This can be even more storage consuming when one need to re-format array data to be co-analyzed by genome-wide data. tbmate can read a re-arranged address file so that data is used under the new coordinate system withot actual data re-storage. For example, one can use array data with a genomic coordinate so that it is used as a whole genome data. 
 
-Array to genomic coordinates
+Here is an example to demo projection of array (Infinium EPIC beadchip) to hg38 genomic coordinates. Note the change in index file with `-i`.
 
 ![coordinate switch1](docs/clip3.gif)
 
-Genomic coordinates to array
+Here is another example of using WGBS data as if it's on the array platform. The index projects genomic coordinates to array probe ID:
 
 ![coordinate switch2](docs/clip4.gif)
 
-Data preprocessed under one genome assembly, analyzed under another
+Here is an example of projecting across genome assemblies (hg38 to hg19):
 
 ![coordinate switch3](docs/clip5.gif)
+
+All index files can be uniquely specified by platform (genome assembly, array ID system etc.) and do not depend on data. Datasets can share one copy through symlinks.
 
 ## Usage
 
