@@ -38,18 +38,21 @@ tbk_hdrs <- function(tbk_fnames) {
     })
 }
 
-tbk_data_bulk <- function(tbk_fnames, idx_addr, hdr) {
+tbk_data_bulk <- function(tbk_fnames, idx_addr) {
+    idx_addr <- sort(idx_addr)
     data <- do.call(cbind, lapply(tbk_fnames, function(tbk_fname) {
         in_file <- file(tbk_fname,'rb')
         on.exit(close(in_file))
         hdr <- tbk_hdr(in_file)
+        idx_addr <- ifelse(idx_addr < 0, NA, idx_addr)
         readBin(in_file, dtype_type[hdr$dtype], hdr$num, dtype_size[hdr$dtype])[idx_addr+1]
     }))
     rownames(data) <- names(idx_addr)
     data
 }
 
-tbk_data_addr <- function(tbk_fnames, idx_addr, hdr) {
+tbk_data_addr <- function(tbk_fnames, idx_addr) {
+    idx_addr <- sort(idx_addr)
     data <- do.call(cbind, lapply(tbk_fnames, function(tbk_fname) {
         in_file <- file(tbk_fname,'rb')
         on.exit(close(in_file))
@@ -57,6 +60,7 @@ tbk_data_addr <- function(tbk_fnames, idx_addr, hdr) {
 
         curr_offset <- 0
         betas1 <- sapply(idx_addr, function(offset) {
+            if (offset < 0) return(NA)
             if (offset != curr_offset) {
                 seek(in_file, where=offset*dtype_size[hdr$dtype]+HDR_TOTALBYTES, origin='start')
                 curr_offset <- offset
@@ -79,6 +83,16 @@ tbk_data_addr <- function(tbk_fnames, idx_addr, hdr) {
     }))
 }
 
+tbk_data0 <- function(tbk_fnames, idx_addr, max_addr, max_source) {
+
+    ## read whole data set only if there are too many addresses but too small source data
+    if (tbk_hdrs(tbk_fnames[1])[[1]]$num < max_source && length(idx_addr) < max_addr) {
+        tbk_data_bulk(tbk_fnames, idx_addr)
+    } else {
+        tbk_data_addr(tbk_fnames, idx_addr)
+    }
+}
+
 #' Get data from tbk
 #'
 #' Assumption:
@@ -93,10 +107,16 @@ tbk_data_addr <- function(tbk_fnames, idx_addr, hdr) {
 #' @param probes probe names
 #' @param simplify reduce matrix to vector if only one sample is queried
 #' @param name.use.base use basename for sample name
-#' @param mx maximum number of probes to do random addressing
+#' @param max_addr random addressing if under max_addr
+#' @param min_source random addressing if source size is under min_source
 #' @return numeric matrix
 #' @export
-tbk_data <- function(tbk_fnames, idx_fname = NULL, probes = NULL, simplify = FALSE, name.use.base=TRUE, mx = 1000) {
+tbk_data <- function(
+    tbk_fnames, idx_fname = NULL, probes = NULL, show.unaddressed = FALSE,
+    chrm = NULL, beg = NULL, end = NULL, as.matrix = FALSE,
+    simplify = FALSE, name.use.base=TRUE, max_addr = 3000, max_source = 10^6) {
+
+    library(Rsamtools)
 
     if (length(tbk_fnames) == 1 && dir.exists(tbk_fnames[1])) {
         tbk_fnames <- list.files(tbk_fnames, '.tbk$', full.names=TRUE)
@@ -110,28 +130,42 @@ tbk_data <- function(tbk_fnames, idx_fname = NULL, probes = NULL, simplify = FAL
             stop("Cannot locate index file. Provide through idx_fname.\n")
         }
     }
-    
-    idx_addr <- with(read.table(gzfile(idx_fname),
-        header=F, stringsAsFactors=FALSE), setNames(V4,V1))
-    
-    if (length(probes) > 0) {
-        idx_addr <- idx_addr[probes]
-    }
-    idx_addr <- sort(idx_addr)
 
-    if (length(idx_addr) > mx) { # read whole data set if too many addr
-        data <- tbk_data_bulk(tbk_fnames, idx_addr, hdr)
-    } else {
-        data <- tbk_data_addr(tbk_fnames, idx_addr, hdr)
-    }
-    
-    if (ncol(data) == 1) data <- data[,1]
-    else {
-        if (name.use.base) {
-            colnames(data) <- tools::file_path_sans_ext(basename(tbk_fnames))
-        } else {
-            colnames(data) <- tbk_fnames
+    if (is.null(chrm)) { # treat as probe
+        idx_addr <- with(read.table(gzfile(idx_fname),
+            header=F, stringsAsFactors=FALSE), setNames(V4,V1))
+        if (length(probes) > 0) {
+            idx_addr <- idx_addr[probes]
         }
+    } else {
+        if (is.null(beg)) beg <- 1
+        if (is.null(end)) end <- 2^28
+        input_range <- GRanges(chrm, IRanges(beg, end))
+        df <- as.data.frame(t(simplify2array(strsplit(scanTabix(
+            idx_fname, param=input_range)[[1]], '\t'))), stringsAsFactors = FALSE)
+        colnames(df)[1:4] <- c('seqnames','beg','end','offset')
+        df$offset <- as.integer(df$offset)
+        if (!show.unaddressed) df <- df[df$offset >= 0,]
+        idx_addr <- setNames(df$offset, rownames(df))
+    }
+
+    data <- tbk_data0(tbk_fnames, idx_addr, max_addr, max_source)
+
+    if (name.use.base) {
+        colnames(data) <- tools::file_path_sans_ext(basename(tbk_fnames))
+    } else {
+        colnames(data) <- tbk_fnames
+    }
+
+    if (!is.null(chrm)) {
+        if (as.matrix && ncol(df)>=5) {
+            rownames(data) <- df[rownames(data),5]
+            data <- as.matrix(data)
+        } else {
+            data <- cbind(df[rownames(data),], data)
+        }
+    } else if (ncol(data) == 1 && simplify) {
+        data <- data[,1]
     }
 
     data
@@ -219,22 +253,6 @@ tbk_pack <- function(data, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_
     })
 }
 
-test <- function() {
-    source('/home/zhouw3/repo/tbmate/scripts/tbmate.R')
-    
-    betas <- readRDS('/mnt/isilon/zhou_lab/projects/20191212_GEO_datasets/GSE120878/betas_GEOLoadSeriesMatrix.rds')
-    tbk_pack(betas, out_dir = '/home/zhouw3/repo/tbmate/test/HM450/tbk', idx_fname = '/mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/HM450/HM450.idx.gz', msg = 'idx:/mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/HM450/HM450.idx.gz')
-
-    hdrs <- tbk_hdrs('/home/zhouw3/repo/tbmate/test/HM450/tbk/GSM3417643.tbk')
-    bb <- tbk_data('/home/zhouw3/repo/tbmate/test/HM450/tbk/GSM3417643.tbk')
-    bb <- tbk_data('/home/zhouw3/repo/tbmate/test/HM450/tbk/GSM3417643.tbk', probes='cg00059930')
-    bb <- tbk_data(list.files('/home/zhouw3/repo/tbmate/test/HM450/tbk/', '.tbk$', full.names=T), probes=c('cg00059930','cg27647152','cg27648216'))
-    head(bb[,1:4])
-
-    tbk_hdrs('/home/zhouw3/repo/tbmate/test/EPIC/tbk/GSM2998063_201868590267_R01C01.tbk')
-    bb <- tbk_data('/home/zhouw3/repo/tbmate/test/EPIC/tbk/')
-}
-    
 #' Read from tabix-indexed bed file to list objects
 #' 
 #' @param paths paths to the bed files
