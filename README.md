@@ -47,7 +47,7 @@ Data preprocessed under one genome assembly, analyzed under another
 
 ## Usage
 
-### data packing
+### Pack into .tbk files
 
 ```
 tbmate pack -s float input.bed output.tbk
@@ -92,7 +92,7 @@ Currently tbmate supports the following data types
 4. DOUBLE: 8 bytes
 5. ONES: 2 bytes, low precision (3e-5) storage for [-1,1] real number.
 
-### view 
+### View .tbk files
 
 ```
 tbmate view input.tbk [more_input.tbk [...]]
