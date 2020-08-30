@@ -41,7 +41,7 @@ static int usage() {
   fprintf(stderr, "\n");
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "    -s        int2, int32, int, float, double, ones ([-1,1] up to 3e-5 precision)\n");
-  fprintf(stderr, "    -x        optional output of a .bed4i file containing address for each record.\n");
+  fprintf(stderr, "    -x        optional output of an index file containing address for each record.\n");
   fprintf(stderr, "    -h        This help\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Note, in.bed is a position sorted bed file. Column 4 will be made a .tbk file.\n");
@@ -108,7 +108,7 @@ void tbk_write(char *s, data_type_t dt, FILE *out, int n, uint8_t *aux) {
     fwrite(&d, sizeof(uint16_t), 1, out);
     break;
   }
-  case DT_NA: wzfatal("Fail to detect data type. Please specify -s explicity.\n");
+  case DT_NA: wzfatal("Fail to detect data type. Please specify -s explicity.\n"); break;
   default: wzfatal("Unrecognized data type: %d.\n", dt);
   }
 }
@@ -118,7 +118,7 @@ int main_pack(int argc, char *argv[]) {
   int c;
   if (argc<2) return usage();
   data_type_t dt = DT_NA;
-  char *bed4i_path = NULL;
+  char *idx_path = NULL;
   char msg[HDR_EXTRA] = {0};
   while ((c = getopt(argc, argv, "s:x:m:h"))>=0) {
     switch (c) {
@@ -131,7 +131,7 @@ int main_pack(int argc, char *argv[]) {
       else if (strcmp(optarg, "ones") == 0) dt = DT_ONES;
       else wzfatal("Unrecognized data type: %s.\n", optarg);
       break;
-    case 'x': bed4i_path = strdup(optarg); break;
+    case 'x': idx_path = strdup(optarg); break;
     case 'm': {
       if (strlen(optarg) > HDR_EXTRA - 1) wzfatal("Message cannot be over %d in length.", HDR_EXTRA);
       strcpy(msg, optarg);
@@ -156,14 +156,14 @@ int main_pack(int argc, char *argv[]) {
 
   char *bd;
 
-  FILE *bed4i = NULL;
-  if (bed4i_path) {
-    if (strcmp(bed4i_path, "stdout") == 0) {
-      bed4i = stdout;
-    } else if (strcmp(bed4i_path, "stderr") == 0) {
-      bed4i = stderr;
+  FILE *idx = NULL;
+  if (idx_path) {
+    if (strcmp(idx_path, "stdout") == 0) {
+      idx = stdout;
+    } else if (strcmp(idx_path, "stderr") == 0) {
+      idx = stderr;
     } else {
-      bed4i = fopen(bed4i_path, "w");
+      idx = fopen(idx_path, "w");
     }
   }
 
@@ -173,8 +173,8 @@ int main_pack(int argc, char *argv[]) {
   uint8_t aux;                  /* sub-byte encoding */
   while (bed_read1(bed, b, parse_data)) {
 
-    if (bed4i) {
-      fprintf(bed4i, "%s\t%"PRId64"\t%"PRId64"\t%"PRId64"\n", b->seqname, b->beg, b->end, n);
+    if (idx) {
+      fprintf(idx, "%s\t%"PRId64"\t%"PRId64"\t%"PRId64"\n", b->seqname, b->beg, b->end, n);
     }
     
     bd = (char*) b->data;
@@ -210,9 +210,9 @@ int main_pack(int argc, char *argv[]) {
   
   free_bed1(b, NULL);
   free_bed_file(bed);
-  if (bed4i) {
-    fclose(bed4i);
-    free(bed4i_path);
+  if (idx) {
+    fclose(idx);
+    free(idx_path);
   }
 
   /* the actual size */
