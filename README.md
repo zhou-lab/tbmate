@@ -1,4 +1,4 @@
-# tbmate: nimble disk storage and access for genomic data
+# TabixMate: nimble storage and retrieval of multifarious large-scale genomic data
 
 tbmate (TabixMate) works with [Tabix](http://www.htslib.org/doc/tabix.html) - the Swiss-knife tool for random accessing genomic data. However, there are 3 limitations of applying tabix to large genome-wide data sets.
 
