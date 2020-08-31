@@ -296,10 +296,10 @@ int main_view(int argc, char *argv[]) {
   char *regions_fname = NULL;
   char *region = NULL;
   FILE *out_fh = stdout;
-  char *bed4i_fname = NULL;
+  char *idx_fname = NULL;
   while ((c = getopt(argc, argv, "i:o:R:p:g:caduh"))>=0) {
     switch (c) {
-    case 'i': bed4i_fname = strdup(optarg); break;
+    case 'i': idx_fname = strdup(optarg); break;
     case 'o': out_fh = fopen(optarg, "w"); break;
     case 'R': regions_fname = optarg; break;
     case 'g': region = strdup(optarg); break;
@@ -346,21 +346,38 @@ int main_view(int argc, char *argv[]) {
     }
   }
 
-  if (!bed4i_fname) {
-    char *tmp = strdup(tbks[0].fname);
+  /* look at the message box */
+  if (!idx_fname) {
+    /* try read the header names */
+    htsFile *fp;
+    for(i=0; i<n_tbks; ++i) {
+      tbk_open(&tbks[i]);
+      fp = hts_open(tbks[i].extra,"r");
+      if(fp) {
+        idx_fname = strdup(tbks[i].extra);
+        tbk_close(&tbks[i]);
+        break;
+      }
+      tbk_close(&tbks[i]);
+    }
+  }
+
+  /* look at the first tbk folder idx.gz */
+  if (!idx_fname) {
+    char *tmp = strdup(tbks[0].fname); /* search first tbk */
     char *dir = dirname(tmp);
-    bed4i_fname = calloc(strlen(dir) + 10, sizeof(char));
-    strcpy(bed4i_fname, dir);
-    strcat(bed4i_fname, "/idx.gz");
+    idx_fname = calloc(strlen(dir) + 10, sizeof(char));
+    strcpy(idx_fname, dir);
+    strcat(idx_fname, "/idx.gz");
     free(tmp);
   }
 
   regs = parse_regions(regions_fname, region, &nregs);
   int ret;
-  ret = query_regions(bed4i_fname, regs, nregs, tbks, n_tbks, &conf, out_fh);
+  ret = query_regions(idx_fname, regs, nregs, tbks, n_tbks, &conf, out_fh);
   if (n_tbks > 0) {for (i=0; i<n_tbks; ++i) free(tbks[i].fname);}
   free(tbks);
-  if (bed4i_fname) free(bed4i_fname);
+  if (idx_fname) free(idx_fname);
   return ret;
 }
 

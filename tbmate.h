@@ -43,8 +43,8 @@
 #define HDR_VERSION    4
 #define HDR_DATA_TYPE  4
 #define HDR_MAX_OFFSET 8
-#define HDR_EXTRA      493      /* message */
-#define HDR_TOTALBYTES 512
+#define HDR_EXTRA      8173      /* message */
+#define HDR_TOTALBYTES 8192
 
 #define HDR_MAX_OFFSET0 (3+4+4) /* offset to max offset */
 #define MAX_DOUBLE16 ((1<<15)-2)
@@ -87,6 +87,12 @@ static inline void tbk_open(tbk_t *tbk) {
   fread(&tbk->dt, HDR_DATA_TYPE, 1, tbk->fh);
   fread(&tbk->offset_max, HDR_MAX_OFFSET, 1, tbk->fh);
   fread(&tbk->extra, HDR_EXTRA, 1, tbk->fh);
+  tbk->offset = 0;
+}
+
+static inline void tbk_open_write(tbk_t *tbk) {
+  tbk->fh = fopen(tbk->fname, "wb");
+  if (!tbk->fh) wzfatal("Cannot open %s to read.\n", tbk->fname);
   tbk->offset = 0;
 }
 
