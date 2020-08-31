@@ -49,6 +49,10 @@ All index files can be uniquely specified by platform (genome assembly, array ID
 
 ## Usage
 
+### Installation
+
+Download the repo and run `make`. R script is inside the scripts folder.
+
 ### Pack into .tbk files
 
 ```
