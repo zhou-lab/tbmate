@@ -29,7 +29,7 @@ Here is another example of Whole Genome Bisulfite Sequencing Data, stored and ac
 
 ![random access2](docs/clip2.gif)
 
-## Switch coordinate without copying data.
+## Virtual coordinate switch without copying data.
 
 It is cumbersome to keep another copy of data after changing genome assembly. This can be even more storage consuming when one need to re-format array data to be co-analyzed by genome-wide data. tbmate can read a re-arranged address file so that data is used under the new coordinate system withot actual data re-storage. For example, one can use array data with a genomic coordinate so that it is used as a whole genome data. 
 
