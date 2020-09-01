@@ -24,6 +24,7 @@
  * 
 **/
 
+#include <inttypes.h>
 #include <dirent.h>
 #include "tbmate.h"
 #include "wzmisc.h"
@@ -34,43 +35,51 @@
 #include "htslib/htslib/regidx.h"
 #include "htslib/htslib/kstring.h"
 
+static void error(const char *format, ...) {
+  va_list ap;
+  va_start(ap, format);
+  vfprintf(stderr, format, ap);
+  va_end(ap);
+  exit(EXIT_FAILURE);
+}
+
 /* output the i-th data entry */
 void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
 
   switch(d->dtype) {
   case  DT_INT2: {
-    kprintf(ks, "\t%d", ((uint8*)d->data[i]));
+    ksprintf(ks, "\t%d", ((uint8_t*)(d->data))[i]);
     break;
   }
   case DT_INT32: {
-    int data = ((int32_t*) d->data)[i];
+    int data = ((int32_t*) (d->data))[i];
     if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
-    else kprintf(ks, "\t%d", data);
+    else ksprintf(ks, "\t%d", data);
     break;
   }
   case DT_FLOAT: {
-    float data = ((float*) d->data)[i];
+    float data = ((float*) (d->data))[i];
     if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
-    else kprintf(ks, "\t%f", data);
+    else ksprintf(ks, "\t%f", data);
     break;
   }
   case DT_ONES: {
-    float data = ((float*) d->data)[i];
-    if (conf->dot_for_negative && dataf < 0) kputs("\t.", ks);
-    else kprintf(ks, "\t%.*f", conf->precision, dataf);
+    float data = ((float*) (d->data))[i];
+    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
+    else ksprintf(ks, "\t%.*f", conf->precision, data);
     break;
   }
   case DT_DOUBLE: {
-    double data = ((double*) d->data)[i];
+    double data = ((double*) (d->data))[i];
     if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
-    else kprintf(ks, "\t%f", data);
+    else ksprintf(ks, "\t%f", data);
     break;
   }
-  default: wzfatal("Unrecognized data type: %d.\n", tbk->dt);
+  default: wzfatal("Unrecognized data type: %d.\n", d->dtype);
   }
 }
 
-void tbk_query_n(tbk_t *tbk, int64_t offset, int n, view_conf_t *conf, tbk_data_t *data) {
+void tbk_query_n(tbk_t *tbk, int64_t offset, int n, tbk_data_t *data) {
   if (offset >= tbk->offset_max) {wzfatal("Error: query %d out of range. Wrong idx file?", offset);}
   if (offset + n >= tbk->offset_max) {
     n = tbk->offset_max - offset;
@@ -88,7 +97,8 @@ void tbk_query_n(tbk_t *tbk, int64_t offset, int n, view_conf_t *conf, tbk_data_
     int nb = (offset + n) / 4 - offset / 4 + 1;
     uint8_t *tmp = calloc(nb, 1);
     fread(tmp, 1, nb, tbk->fh); tbk->offset += n;
-    for (ii=0; ii<n; ++i) ((uint8_t*)data->data)[ii] = (tmp[(offset+ii)/4 - offset/4] >> (((offset+ii)%4)*2)) & 0x3;
+    int i;
+    for (i=0; i<n; ++i) ((uint8_t*)data->data)[i] = (tmp[(offset+i)/4 - offset/4] >> (((offset+i)%4)*2)) & 0x3;
     break;
   }
   case DT_INT32: {
@@ -143,7 +153,8 @@ void tbk_query_n(tbk_t *tbk, int64_t offset, int n, view_conf_t *conf, tbk_data_
 }
 
 /* process one chunk */
-static void query_one_chunk(int *offsets, int n_offsets, tbk_t *tbks, int n_tbks, view_conf_t *conf, kstring_t *ks_out) {
+static void query_one_chunk(int *offsets, int n_offsets, tbk_t *tbks,
+                            int n_tbks, view_conf_t *conf, kstring_t *ks_out, FILE*out_fh) {
 
   if (n_offsets == 0) return;
   
@@ -151,9 +162,9 @@ static void query_one_chunk(int *offsets, int n_offsets, tbk_t *tbks, int n_tbks
   tbk_data_t data = {0};
   for(k=0; k<n_tbks; ++k) {     /* iterate through samples */
     int chunk_beg = 0;
-    for (chunk_beg = 0; chunk_beg < tkbs[k].offset_max; chunk_beg += conf->n_chunk_data) { /* iterate data chunk */
-      int chunk_end = (chunk_beg + conf->n_chunk_data > tkbs[k].offset_max) ? tkbs[k].offset_max : chunk_beg + conf->n_chunk_data;
-      tbk_query_n(&tbks[k], offset, conf->n_chunk_data, conf, &data[k]);
+    for (chunk_beg = 0; chunk_beg < tbks[k].offset_max; chunk_beg += conf->n_chunk_data) { /* iterate data chunk */
+      int chunk_end = (chunk_beg + conf->n_chunk_data > tbks[k].offset_max) ? tbks[k].offset_max : (chunk_beg + conf->n_chunk_data);
+      tbk_query_n(&tbks[k], chunk_beg, conf->n_chunk_data, &data);
       if (chunk_end - chunk_beg != data.n) {
         wzfatal("Unequal number of records read %d, expecting %d\n", data.n, chunk_end-chunk_beg);
       }
@@ -162,23 +173,27 @@ static void query_one_chunk(int *offsets, int n_offsets, tbk_t *tbks, int n_tbks
       int i;
       for(i=0; i<n_offsets; ++i) {
         if (offsets[i] >= chunk_beg && offsets[i] < chunk_end) {
-          tbk_print1(&data, i, conf, &ks_out[offset[i]-chunk_beg]);
+          tbk_print1(&data, i, conf, &ks_out[offsets[i]-chunk_beg]);
         }
       }
     }
   }
 
   /* output and reset */
-  int ii;
-  for (ii=0; ii < index_chunk_end - index_chunk_beg; ++i) {
-    fputs(ks_out[ii].s, sout_fh);
-    free(ks_out[ii].s); memset(&ks_out[ii], 0 , sizeof(kstring_t));
+  int i;
+  for (i=0; i < n_offsets; ++i) {
+    fputs(ks_out[i].s, out_fh);
+    free(ks_out[i].s); memset(&ks_out[i], 0 , sizeof(kstring_t));
   }
   memset(offsets, 0, sizeof(int) * conf->n_chunk_index);
 }
 
 int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_tbks, view_conf_t *conf, FILE *out_fh) {
 
+  int i;
+  htsFile *fp = hts_open(fname,"r");
+  if(!fp) error("Could not read %s\n", fname);
+  
   int k;
   for(k=0; k<n_tbks; ++k) tbk_open(&tbks[k]);
 
@@ -235,7 +250,7 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
         kputs(fields[0], ks); kputc('\t', ks);
         kputs(fields[1], ks); kputc('\t', ks);
         kputs(fields[2], ks);
-        if (conf->printf_all) {
+        if (conf->print_all) {
           for (ii=3; ii<nfields; ++i)
             ksprintf(ks, "\t%s", fields[ii]);
         }
@@ -243,7 +258,7 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
       offsets[index_chunk_end - index_chunk_beg] = offset;
       
       if ((index_chunk_end+1) % conf->n_chunk_index == 0) {
-        query_one_chunk(offsets, index_chunk_end-index_chunk_beg, tbks, n_tbks, conf, ks_out);
+        query_one_chunk(offsets, index_chunk_end-index_chunk_beg, tbks, n_tbks, conf, ks_out, out_fh);
         index_chunk_beg = index_chunk_end + 1;
       }
                 
@@ -255,7 +270,7 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
     tbx_itr_destroy(itr);
   }
 
-  query_one_chunk(offsets, index_chunk_end-index_chunk_beg, tbks, n_tbks, conf, ks_out);
+  query_one_chunk(offsets, index_chunk_end-index_chunk_beg, tbks, n_tbks, conf, ks_out, out_fh);
   
   free(offsets);
   free(seq);

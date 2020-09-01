@@ -181,9 +181,6 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
   htsFile *fp = hts_open(fname,"r");
   if(!fp) error("Could not read %s\n", fname);
 
-  if (conf->chunk_read)
-    return(chunk_query_region(fname, regs, nregs, tbks, n_tbks, conf, out_fh));
-
   int k;
   for(k=0; k<n_tbks; ++k) tbk_open(&tbks[k]);
 
@@ -378,7 +375,11 @@ int main_view(int argc, char *argv[]) {
 
   regs = parse_regions(regions_fname, region, &nregs);
   int ret;
-  ret = query_regions(idx_fname, regs, nregs, tbks, n_tbks, &conf, out_fh);
+  if (conf.chunk_read)
+    ret = chunk_query_region(idx_fname, regs, nregs, tbks, n_tbks, &conf, out_fh);
+  else
+    ret = query_regions(idx_fname, regs, nregs, tbks, n_tbks, &conf, out_fh);
+  
   if (n_tbks > 0) {for (i=0; i<n_tbks; ++i) free(tbks[i].fname);}
   free(tbks);
   if (idx_fname) free(idx_fname);
