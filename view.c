@@ -34,36 +34,6 @@
 #include "htslib/htslib/regidx.h"
 #include "htslib/htslib/kstring.h"
 
-typedef struct view_conf_t {
-  int precision;
-  int column_name;
-  int print_all;
-  int dot_for_negative;
-  int show_unaddressed;
-} view_conf_t;
-
-static int usage(view_conf_t *conf) {
-  fprintf(stderr, "\n");
-  fprintf(stderr, "Usage: tbmate view [options] [.tbk [...]]\n");
-  fprintf(stderr, "\n");
-  fprintf(stderr, "Options:\n");
-  fprintf(stderr, "    -o        optional file output\n");
-  fprintf(stderr, "    -i        index, a tabix-ed bed file. Column 4 is the .tbk offset.\n");
-  fprintf(stderr, "              if not given search for idx.gz and idx.gz.tbi in the folder\n");
-  fprintf(stderr, "              containing the first tbk file.\n");
-  fprintf(stderr, "    -g        REGION\n");
-  fprintf(stderr, "    -c        print column name\n");
-  fprintf(stderr, "    -a        print all column in the index\n");
-  fprintf(stderr, "    -d        using dot for negative values\n");
-  fprintf(stderr, "    -p        precision used to print float[%d]\n", conf->precision);
-  fprintf(stderr, "    -u        show unaddressed (use -1)\n");
-  fprintf(stderr, "    -R        file listing the regions\n");
-  fprintf(stderr, "    -h        This help\n");
-  fprintf(stderr, "\n");
-
-  return 1;
-}
-
 static void error(const char *format, ...) {
   va_list ap;
   va_start(ap, format);
@@ -211,6 +181,9 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
   htsFile *fp = hts_open(fname,"r");
   if(!fp) error("Could not read %s\n", fname);
 
+  if (conf->chunk_read)
+    return(chunk_query_region(fname, regs, nregs, tbks, n_tbks, conf, out_fh));
+
   int k;
   for(k=0; k<n_tbks; ++k) tbk_open(&tbks[k]);
 
@@ -281,6 +254,31 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
   return 0;
 }
 
+static int usage(view_conf_t *conf) {
+  fprintf(stderr, "\n");
+  fprintf(stderr, "Usage: tbmate view [options] [.tbk [...]]\n");
+  fprintf(stderr, "\n");
+  fprintf(stderr, "Options:\n");
+  fprintf(stderr, "    -o        optional file output\n");
+  fprintf(stderr, "    -i        index, a tabix-ed bed file. Column 4 is the .tbk offset.\n");
+  fprintf(stderr, "              if not given search for idx.gz and idx.gz.tbi in the folder\n");
+  fprintf(stderr, "              containing the first tbk file.\n");
+  fprintf(stderr, "    -g        REGION\n");
+  fprintf(stderr, "    -c        print column name\n");
+  fprintf(stderr, "    -a        print all column in the index\n");
+  fprintf(stderr, "    -d        using dot for negative values\n");
+  fprintf(stderr, "    -p        precision used to print float[%d]\n", conf->precision);
+  fprintf(stderr, "    -u        show unaddressed (use -1)\n");
+  fprintf(stderr, "    -R        file listing the regions\n");
+  fprintf(stderr, "    -k        read data in chunk\n");
+  fprintf(stderr, "    -m        chunk size for index [%d], valid under -k.\n", conf->n_chunk_index);
+  fprintf(stderr, "    -n        chunk size for data [%d], valid under -k.\n", conf->n_chunk_data);
+  fprintf(stderr, "    -h        This help\n");
+  fprintf(stderr, "\n");
+
+  return 1;
+}
+
 int main_view(int argc, char *argv[]) {
 
   view_conf_t conf = {0};
@@ -289,6 +287,9 @@ int main_view(int argc, char *argv[]) {
   conf.column_name = 0;
   conf.dot_for_negative = 0;
   conf.show_unaddressed = 0;
+  conf.chunk_read = 0;
+  conf.n_chunk_index = 1000000;
+  conf.n_chunk_data = 1000000;
   
   int c;
   if (argc<2) return usage(&conf);
@@ -297,14 +298,17 @@ int main_view(int argc, char *argv[]) {
   char *region = NULL;
   FILE *out_fh = stdout;
   char *idx_fname = NULL;
-  while ((c = getopt(argc, argv, "i:o:R:p:g:caduh"))>=0) {
+  while ((c = getopt(argc, argv, "i:o:R:m:n:p:g:ckaduh"))>=0) {
     switch (c) {
     case 'i': idx_fname = strdup(optarg); break;
     case 'o': out_fh = fopen(optarg, "w"); break;
     case 'R': regions_fname = optarg; break;
+    case 'm': conf.n_chunk_index = atoi(optarg); break;
+    case 'n': conf.n_chunk_data = atoi(optarg); break;
     case 'g': region = strdup(optarg); break;
     case 'p': conf.precision = atoi(optarg); break;
     case 'c': conf.column_name = 1; break;
+    case 'k': conf.chunk_read = 1; break;
     case 'a': conf.print_all = 1; break;
     case 'd': conf.dot_for_negative = 1; break;
     case 'u': conf.show_unaddressed = 1; break;

@@ -110,4 +110,23 @@ static inline void tbk_close(tbk_t *tbk) {
   memset(tbk, 0, sizeof(tbk_t));
 }
 
+typedef struct view_conf_t {
+  int precision;
+  int column_name;
+  int print_all;
+  int dot_for_negative;
+  int show_unaddressed;
+  int chunk_read;
+  int n_chunk_index;
+  int n_chunk_data;
+} view_conf_t;
+
+typedef struct tbk_data_t {
+  data_type_t dtype;
+  void *data;
+  int n;
+} tbk_data_t;
+
+int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_tbks, view_conf_t *conf, FILE *out_fh);
+
 #endif /* _TBMATE_H */
