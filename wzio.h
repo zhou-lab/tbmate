@@ -134,4 +134,32 @@ static inline void line_get_fields(const char *line, const char *sep, char ***fi
 }
 
 
+static inline void line_get_fields2(
+  const char *line, const char *sep, char ***fields, int *nfields, char **aux) {
+
+  int nfields_ = 1;
+  const char *s = line;
+  while ((s = strpbrk(s, sep)) != NULL) { nfields_++; s++; }
+
+  if (*nfields < 0) {
+    *nfields = nfields_;
+    *fields = calloc(*nfields, sizeof(char*));
+  } else if (*nfields != nfields_) {
+    fprintf(stderr, "Wrong field number %d (expecting %d).\n", nfields_, *nfields);
+    fflush(stderr);
+    exit(1);
+  }
+
+  *aux = realloc(*aux, (strlen(line) + 1) * sizeof(char));
+  strcpy(*aux, line);
+  char *tok; int i;
+
+  tok = strtok(*aux, sep);
+  for (i=0; tok != NULL; ++i) {
+    (*fields)[i] = realloc((*fields)[i], strlen(tok)+1);
+    strcpy((*fields)[i], tok);
+    tok = strtok(NULL, sep);
+  }
+}
+
 #endif /* _WZIO_H */

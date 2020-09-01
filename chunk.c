@@ -209,7 +209,12 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
   if(!tbx) error("Could not load .tbi/.csi index of %s\n", fname);
   kstring_t str = {0,0,0};
   const char **seq = NULL;
-  char **fields; int nfields = -1;
+
+  /* line reading and splitting */
+  char **fields = NULL;
+  int nfields = -1;
+  char *aux = NULL;
+  
   int offset, ii;
   int linenum=0;
 
@@ -226,16 +231,11 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
     if(!itr) continue;
     while (tbx_itr_next(fp, tbx, itr, &str) >= 0) {
 
-      int nfields_;
-      line_get_fields(str.s, "\t", &fields, &nfields_);
+      line_get_fields2(str.s, "\t", &fields, &nfields, &aux);
 
-      if (nfields_ < 3)
+      if (nfields < 3)
         wzfatal("[%s:%d] Bed file has fewer than 3 columns.\n", __func__, __LINE__);
 
-      if (nfields < 0) nfields = nfields_;
-      else if (nfields != nfields_)
-        wzfatal("[%s:%d] Row %d has %d columns (expecting %d).\n", __func__, __LINE__, linenum+1, nfields_, nfields);
-                
       if (!linenum && conf->column_name) { /* header */
         fputs("seqname\tstart\tend", out_fh);
         if (conf->print_all) {
@@ -250,7 +250,7 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
         fputc('\n', out_fh);
       }
       
-      ensure_number2(fields[3]);
+      /* ensure_number2(fields[3]); */ // this is slow
       offset = atoi(fields[3]);
 
       if (offset >= 0 || conf->show_unaddressed) {
@@ -273,14 +273,14 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
       }
       
       linenum++;
-      free(fields);
-      /* free_fields(fields, nfields); */
     }
     tbx_itr_destroy(itr);
   }
 
   query_one_chunk(offsets, index_chunk_end-index_chunk_beg-1, tbks, n_tbks, conf, ks_out, out_fh);
-  
+
+  free_fields(fields, nfields);
+  free(aux);
   free(offsets);
   free(seq);
   free(str.s);
