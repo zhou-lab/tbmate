@@ -90,8 +90,8 @@ static inline void tbk_open(tbk_t *tbk) {
   tbk->offset = 0;
 }
 
-static inline void tbk_open_write(tbk_t *tbk) {
-  tbk->fh = fopen(tbk->fname, "wb");
+static inline void tbk_open_update(tbk_t *tbk) {
+  tbk->fh = fopen(tbk->fname, "r+b");
   if (!tbk->fh) wzfatal("Cannot open %s to read.\n", tbk->fname);
   tbk->offset = 0;
 }
@@ -107,7 +107,9 @@ static inline void tbk_write_hdr(int32_t version, data_type_t dt, int64_t n, cha
 
 static inline void tbk_close(tbk_t *tbk) {
   fclose(tbk->fh);
+  char *fname = tbk->fname;
   memset(tbk, 0, sizeof(tbk_t));
+  tbk->fname = fname;
 }
 
 typedef struct view_conf_t {

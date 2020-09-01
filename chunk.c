@@ -169,11 +169,11 @@ static void query_one_chunk(int *offsets, int n_offsets, tbk_t *tbks,
         wzfatal("Unequal number of records read %d, expecting %d\n", data.n, chunk_end-chunk_beg);
       }
 
-      /* output */
+      /* save to output */
       int i;
       for(i=0; i<n_offsets; ++i) {
         if (offsets[i] >= chunk_beg && offsets[i] < chunk_end) {
-          tbk_print1(&data, i, conf, &ks_out[offsets[i]-chunk_beg]);
+          tbk_print1(&data, offsets[i]-chunk_beg, conf, &ks_out[i]);
         }
       }
     }
@@ -182,8 +182,16 @@ static void query_one_chunk(int *offsets, int n_offsets, tbk_t *tbks,
   /* output and reset */
   int i;
   for (i=0; i < n_offsets; ++i) {
-    fputs(ks_out[i].s, out_fh);
-    free(ks_out[i].s); memset(&ks_out[i], 0 , sizeof(kstring_t));
+    if (ks_out[i].s) {
+      if (offsets[i] >= 0) {
+        fputs(ks_out[i].s, out_fh); fputc('\n', out_fh);
+      } else if (conf->show_unaddressed) {
+        fputs(ks_out[i].s, out_fh);
+        for (k=0; k<n_tbks; ++k) fputs("\t-1", out_fh);
+        fputc('\n', out_fh);
+      }
+      free(ks_out[i].s); memset(&ks_out[i], 0 , sizeof(kstring_t));
+    }
   }
   memset(offsets, 0, sizeof(int) * conf->n_chunk_index);
 }
@@ -206,7 +214,7 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
   int linenum=0;
 
   int index_chunk_beg = 0;
-  int index_chunk_end = 0;
+  int index_chunk_end = 1;
 
   /* offsets in the current chunk */
   int *offsets = calloc(conf->n_chunk_index, sizeof(int));
@@ -246,7 +254,7 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
       offset = atoi(fields[3]);
 
       if (offset >= 0 || conf->show_unaddressed) {
-        kstring_t *ks = &ks_out[index_chunk_end - index_chunk_beg];
+        kstring_t *ks = &ks_out[index_chunk_end - index_chunk_beg - 1];
         kputs(fields[0], ks); kputc('\t', ks);
         kputs(fields[1], ks); kputc('\t', ks);
         kputs(fields[2], ks);
@@ -254,23 +262,24 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
           for (ii=3; ii<nfields; ++i)
             ksprintf(ks, "\t%s", fields[ii]);
         }
-      }
-      offsets[index_chunk_end - index_chunk_beg] = offset;
+        offsets[index_chunk_end - index_chunk_beg - 1] = offset;
       
-      if ((index_chunk_end+1) % conf->n_chunk_index == 0) {
-        query_one_chunk(offsets, index_chunk_end-index_chunk_beg, tbks, n_tbks, conf, ks_out, out_fh);
-        index_chunk_beg = index_chunk_end + 1;
-      }
+        if (index_chunk_end % conf->n_chunk_index == 0) {
+          query_one_chunk(offsets, index_chunk_end-index_chunk_beg, tbks, n_tbks, conf, ks_out, out_fh);
+          index_chunk_beg = index_chunk_end;
+        }
                 
+        index_chunk_end++;
+      }
+      
       linenum++;
-      index_chunk_end++;
       free(fields);
       /* free_fields(fields, nfields); */
     }
     tbx_itr_destroy(itr);
   }
 
-  query_one_chunk(offsets, index_chunk_end-index_chunk_beg, tbks, n_tbks, conf, ks_out, out_fh);
+  query_one_chunk(offsets, index_chunk_end-index_chunk_beg-1, tbks, n_tbks, conf, ks_out, out_fh);
   
   free(offsets);
   free(seq);
