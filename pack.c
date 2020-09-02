@@ -114,20 +114,20 @@ void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tm
   }
   case DT_ONES: {
     uint16_t d = float_to_uint16(atof(s));
-    /* fprintf(stdout, "%f\t%d\n", atof(s),d); */
     fwrite(&d, sizeof(uint16_t), 1, out);
     break;
   }
   case DT_STRINGF: {
-    int n = strlen(s);
+    unsigned n = strlen(s);
     if (n > STRING_MAX(dtype)) s[STRING_MAX(dtype)] = 0;
-    fwrite(&s, 1, n, out);
-    if (n < STRING_MAX(dtype)) { fwrite(&s, 1, STRING_MAX(dtype) - n, out); }
+    fwrite(s, 1, n, out);
+    char buf = '\0';
+    for (;n < STRING_MAX(dtype);++n) { fwrite(&buf, 1, 1, out); }
     break;
   }
   case DT_STRINGD: {
     int n = strlen(s) + 1;
-    fwrite(&s, 1, n, tmp_out);
+    fwrite(s, 1, n, tmp_out);
     fwrite(tmp_out_offset, 8, 1, out);
     *tmp_out_offset += strlen(s) + 1;
     break;
@@ -148,13 +148,14 @@ int main_pack(int argc, char *argv[]) {
   while ((c = getopt(argc, argv, "s:x:m:h"))>=0) {
     switch (c) {
     case 's':
-      if (strcmp(optarg, "int2") == 0) dtype = DT_INT2;
-      else if (strcmp(optarg, "int") == 0) dtype = DT_INT32;
-      else if (strcmp(optarg, "int32") == 0) dtype = DT_INT32;
-      else if (strcmp(optarg, "float") == 0) dtype = DT_FLOAT;
-      else if (strcmp(optarg, "double") == 0) dtype = DT_DOUBLE;
-      else if (strcmp(optarg, "ones") == 0) dtype = DT_ONES;
-      else if (strcmp(optarg, "string") == 0) dtype = DT_STRINGD;
+      if (strcmp(optarg, "int1") == 0)         dtype = DT_INT1;
+      else if (strcmp(optarg, "int2") == 0)    dtype = DT_INT2;
+      else if (strcmp(optarg, "int32") == 0)   dtype = DT_INT32;
+      else if (strcmp(optarg, "int") == 0)     dtype = DT_INT32;
+      else if (strcmp(optarg, "float") == 0)   dtype = DT_FLOAT;
+      else if (strcmp(optarg, "double") == 0)  dtype = DT_DOUBLE;
+      else if (strcmp(optarg, "ones") == 0)    dtype = DT_ONES;
+      else if (strcmp(optarg, "string") == 0)  dtype = DT_STRINGD;
       else if (strcmp(optarg, "stringd") == 0) dtype = DT_STRINGD; /* fixed size string */
       else if (strcmp(optarg, "stringf") == 0) dtype = DT_STRINGF;
       else wzfatal("Unrecognized data type: %s.\n", optarg);
@@ -230,11 +231,11 @@ int main_pack(int argc, char *argv[]) {
       if (dtype == DT_NA) dtype = data_type(samples, n);
       if (tbk_out) tbk_write_hdr(1, dtype, n, msg, tbk_out);
       for(i=0; i<n; ++i) {
-        if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, &tmp_out, &tmp_out_offset);
+        if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset);
         free(samples[i]);
       }
     }
-    if (tbk_out) tbk_write(bd, dtype, tbk_out, n, &aux, &tmp_out, &tmp_out_offset);
+    if (tbk_out) tbk_write(bd, dtype, tbk_out, n, &aux, tmp_out, &tmp_out_offset);
     free(bd);
     n++;
   }
@@ -244,7 +245,7 @@ int main_pack(int argc, char *argv[]) {
     if (dtype == DT_NA) dtype = data_type(samples, n);
     if (tbk_out) tbk_write_hdr(1, dtype, n, msg, tbk_out);
     for(i=0; i<n; ++i) {
-      if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, &tmp_out, &tmp_out_offset);
+      if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset);
       free(samples[i]);
     }
   }
@@ -260,19 +261,23 @@ int main_pack(int argc, char *argv[]) {
 
   /* the actual size */
   fseek(tbk_out, HDR_MAX_OFFSET0, SEEK_SET);
-  fwrite(&n,   HDR_MAX_OFFSET, 1, tbk_out);
+  fwrite(&n,     HDR_MAX_OFFSET, 1, tbk_out);
 
   if (tmp_out) {
     fclose(tmp_out);
+
+    /* exit(1); */
     tmp_out = fopen(tmp_fname, "rb");
-    fseek(tbk_out, SEEK_END);
+    fseek(tbk_out, 0, SEEK_END);
     char data;
-    for (i=0; i<tmp_out_offset; ++i) {
+    unsigned j;
+    for (j=0; j<tmp_out_offset; ++j) {
       fread(&data, 1, 1, tmp_out);
       fwrite(&data, 1, 1, tbk_out);
     }
     fclose(tmp_out);
-    unlink(tmp_out);
+    unlink(tmp_fname);
+    free(tmp_fname);
   }
 
   if (tbk_out) fclose(tbk_out);

@@ -99,12 +99,12 @@ static char **parse_regions(char *regions_fname, char *region, int *nregs) {
   return regs;
 }
 
-void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char *aux) {
+void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char **aux) {
 
   /* when the offset is unfound */
   if (offset < 0) { fputs("\t-1", out_fh); return; }
   if (offset >= tbk->offset_max) {wzfatal("Error: query %d out of range. Wrong idx file?", offset);}
-  
+
   switch(DATA_TYPE(tbk->dtype)) {
   case DT_INT1: {
     if(tbk->offset == 0 || offset/8 != tbk->offset-1) { /* need to read? */
@@ -115,7 +115,7 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
       }
       fread(&(tbk->data), 1, 1, tbk->fh); tbk->offset++;
     }
-    fprintf(out_fh, "\t%d", ((tbk->data)>>(offset%8)) & 0x7);
+    fprintf(out_fh, "\t%d", ((tbk->data)>>(offset%8)) & 0x1);
     break;
   }
   case DT_INT2: {
@@ -185,26 +185,32 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     break;
   }
   case DT_STRINGF: {
+    uint64_t n = STRING_MAX(tbk->dtype);
     if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*STRING_MAX(dtype)+HDR_TOTALBYTES, SEEK_SET))
+      if(fseek(tbk->fh, offset*n+HDR_TOTALBYTES, SEEK_SET))
         wzfatal("File %s cannot be seeked.\n", tbk->fname);
       tbk->offset = offset;
     }
 
-    if (!aux) aux = malloc(STRING_MAX(dtype)+1);
-    fread(&aux, 1, STRING_MAX(dtype), out);
-    if (aux[STRING_MAX(dtype)-1] != NULL) aux[STRING_MAX(dtype)] = '\0';
-
-    fputs(aux, out_fh);
-    int n = strlen(s);
+    if (!*aux) *aux = malloc(n+1);
+    fread(*aux, 1, n, tbk->fh); tbk->offset++;
+    if ((*aux)[n-1] != '\0') (*aux)[n] = '\0';
+    fputc('\t', out_fh);
+    fputs(*aux, out_fh);
     break;
   }
   case DT_STRINGD: {
     if (offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*STRING_MAX(dtype)+HDR_TOTALBYTES, SEEK_SET))
+      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
         wzfatal("File %s cannot be seeked.\n", tbk->fname);
       tbk->offset = offset;
     }
+
+    int64_t string_offset;
+    fread(&string_offset, 8, 1, tbk->fh); tbk->offset++;
+
+    if (fseek(tbk->fh, string_offset+tbk->offset_max*8+HDR_TOTALBYTES, SEEK_SET))
+      wzfatal("File %s cannot be seeked.\n", tbk->fname);
 
     kstring_t ks = {0};
     char c;
@@ -213,8 +219,10 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
       if (c) kputc(c, &ks);
       else break;
     }
-    if (ks.s) fputs(ks.s, out_fh);
+    if (ks.s) { fputc('\t', out_fh); fputs(ks.s, out_fh); }
     free(ks.s);
+
+    tbk->offset = -1; // need to be reset
     break;
   }
   default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(tbk->dtype));
@@ -281,7 +289,7 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
             fprintf(out_fh, "\t%s", fields[ii]);
         }
 
-        for(k=0; k<n_tbks; ++k) tbk_query(&tbks[k], offset, conf, out_fh, aux2);
+        for(k=0; k<n_tbks; ++k) tbk_query(&tbks[k], offset, conf, out_fh, &aux2);
         fputc('\n', out_fh);
       }
     }
@@ -402,10 +410,9 @@ int main_view(int argc, char *argv[]) {
   /* look at the message box */
   if (!idx_fname) {
     /* try read the header names */
-    htsFile *fp;
     for(i=0; i<n_tbks; ++i) {
       tbk_open(&tbks[i]);
-      fp = hts_open(tbks[i].extra,"r");
+      FILE *fp = fopen(tbks[i].extra,"r");
       if(fp) {
         idx_fname = strdup(tbks[i].extra);
         tbk_close(&tbks[i]);

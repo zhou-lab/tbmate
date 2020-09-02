@@ -80,12 +80,16 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
     break;
   }
   case DT_STRINGF: {
-    char *data = ((char*) (d->data))[i*STRING_MAX(d->type)];
-    kputs(data, ks);
+    char *data = ((char*) (d->data)) + i*STRING_MAX(d->dtype);
+    kputc('\t', ks); kputs(data, ks);
     break;
   }
   case DT_STRINGD: {
-    char *data = ((char*) (d->data))
+    char *data = ((char**) (d->data))[i];
+    kputc('\t', ks); kputs(data, ks);
+    free(data);
+    break;
+  }
   default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(d->dtype));
   }
 }
@@ -108,19 +112,25 @@ void tbk_query_n(tbk_t *tbk, int64_t offset, int n, tbk_data_t *data) {
     int nb = (offset + n) / 8 - offset / 8 + 1;
     uint8_t *tmp = calloc(nb, 1);
     fread(tmp, 1, nb, tbk->fh); tbk->offset += n;
+    data->data = realloc(data->data, n);
     int i;
-    for (i=0; i<n; ++i) ((uint8_t*)data->data)[i] = (tmp[(offset+i)/8 - offset/8] >> (offset+i)%8) & 0x7;
+    for (i=0; i<n; ++i) {
+      ((uint8_t*)data->data)[i] = (tmp[(offset+i)/8 - offset/8] >> (offset+i)%8) & 0x1;
+    }
     break;
   }
   case DT_INT2: {
     tbk->offset = offset/4;                           /* always seek */
     if(fseek(tbk->fh, offset/4+HDR_TOTALBYTES, SEEK_SET)) wzfatal("File %s cannot be seeked.\n", tbk->fname);
     
-    int nb = (offset + n) / 4 - offset / 4 + 1;
+    int nb = (offset + n) / 4 - offset / 4;
     uint8_t *tmp = calloc(nb, 1);
     fread(tmp, 1, nb, tbk->fh); tbk->offset += n;
+    data->data = realloc(data->data, n);
     int i;
-    for (i=0; i<n; ++i) ((uint8_t*)data->data)[i] = (tmp[(offset+i)/4 - offset/4] >> (((offset+i)%4)*2)) & 0x3;
+    for (i=0; i<n; ++i) {
+      ((uint8_t*)data->data)[i] = (tmp[(offset+i)/4 - offset/4] >> (((offset+i)%4)*2)) & 0x3;
+    }
     break;
   }
   case DT_INT32: {
@@ -170,13 +180,49 @@ void tbk_query_n(tbk_t *tbk, int64_t offset, int n, tbk_data_t *data) {
     fread(data->data, 8, n, tbk->fh); tbk->offset += n;
     break;
   }
+  case DT_STRINGF: {
+    int smax = STRING_MAX(tbk->dtype);
+    if(offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*n+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+    data->data = realloc(data->data, n*smax);
+    fread(data->data, 1, n*smax, tbk->fh); tbk->offset += n;
+    break;
+  }
+  case DT_STRINGD: {
+    if (offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+
+    data->data = realloc(data->data, sizeof(char*)*n);
+    uint64_t *string_offsets = malloc(sizeof(uint64_t)*n);
+    fread(string_offsets, 8, n, tbk->fh); tbk->offset += n;
+
+    int i;
+    for (i=0; i<n; ++i) {
+      fseek(tbk->fh, string_offsets[i]+tbk->offset_max*8+HDR_TOTALBYTES, SEEK_SET);
+      kstring_t ks = {0}; char c;
+      while (1) {
+        fread(&c, 1,1,tbk->fh);
+        if (c) kputc(c, &ks);
+        else break;
+      }
+      ((char**) data->data)[i] = ks.s;
+    }
+    tbk->offset = -1; // need to be reset
+    free(string_offsets);
+    break;
+  }
   default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(tbk->dtype));
   }
 }
 
 /* process one chunk */
-static void query_one_chunk(int *offsets, int n_offsets, tbk_t *tbks,
-                            int n_tbks, view_conf_t *conf, kstring_t *ks_out, FILE*out_fh) {
+static void query_one_chunk(int *offsets, int n_offsets, tbk_t *tbks, int n_tbks, view_conf_t *conf, kstring_t *ks_out, FILE*out_fh) {
 
   if (n_offsets == 0) return;
   

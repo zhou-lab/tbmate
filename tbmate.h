@@ -46,7 +46,7 @@
 #define HDR_EXTRA      8169      /* message */
 #define HDR_TOTALBYTES 8192
 
-#define HDR_MAX_OFFSET0 (3+4+4) /* offset to max offset */
+#define HDR_MAX_OFFSET0 (3+4+8) /* offset to max offset */
 #define MAX_DOUBLE16 ((1<<15)-2)
 
 #define DT_INT1    1
@@ -118,7 +118,7 @@ static inline void tbk_write_hdr(int32_t version, uint64_t dtype, int64_t n, cha
   fwrite(msg,      HDR_EXTRA,      1, tbk_out);
 }
 
-void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux);
+void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE*tmp_out, uint64_t *tmp_out_offset);
 
 static inline void tbk_close(tbk_t *tbk) {
   fclose(tbk->fh);
