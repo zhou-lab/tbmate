@@ -77,6 +77,17 @@ static inline int gzFile_read_line(gzFile fh, char **s) {
   return 0;                     /* should not come here */
 }
 
+static inline int gzFile_count_lines(gzFile fh) {
+
+  int n = 0;
+  while(1) {
+    int c = gzgetc(fh);
+    if (c == '\n') n++;
+    if (c == EOF) return n+1;
+  }
+  return 0;                     /* should not come here */
+}
+
 /****************************
  ** Get one field by index **
  ****************************

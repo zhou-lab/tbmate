@@ -41,17 +41,30 @@
 /* tbk file header format: */
 #define HDR_ID         3        /* three letter "tbk" */
 #define HDR_VERSION    4
-#define HDR_DATA_TYPE  4
+#define HDR_DATA_TYPE  8
 #define HDR_MAX_OFFSET 8
-#define HDR_EXTRA      8173      /* message */
+#define HDR_EXTRA      8169      /* message */
 #define HDR_TOTALBYTES 8192
 
 #define HDR_MAX_OFFSET0 (3+4+4) /* offset to max offset */
 #define MAX_DOUBLE16 ((1<<15)-2)
 
-typedef enum {
-  DT_NA, DT_INT2, DT_INT32, DT_FLOAT,
-  DT_DOUBLE, DT_ONES} data_type_t;
+#define DT_INT1    1
+#define DT_INT2    2
+#define DT_INT32   3
+#define DT_FLOAT   4
+#define DT_DOUBLE  5
+#define DT_ONES    6
+#define DT_STRINGD 7
+#define DT_STRINGF 8
+#define DT_NA      99
+
+#define DATA_TYPE(d) ((d)&0xff)
+#define STRING_MAX(d) ((d)>>8)
+
+/* typedef enum { */
+/*   DT_NA, DT_INT1, DT_INT2, DT_INT32, DT_FLOAT, */
+/*   DT_DOUBLE, DT_ONES, DT_STRINGD, DT_STRINGF} data_type_t; */
 
 static inline float uint16_to_float(uint16_t i) {
   return ((float)i - MAX_DOUBLE16) / MAX_DOUBLE16;
@@ -68,7 +81,7 @@ typedef struct tbk_t {
   int64_t offset;   /* offset in the number of units or byte if unit is sub-byte */
   int64_t offset_max;          /* offset < offset_max */
   char extra[HDR_EXTRA];
-  data_type_t dt;               /* data type */
+  uint64_t dtype;            /* data type */
   uint8_t data;                 /* sub-byte data */
 } tbk_t;
 
@@ -83,10 +96,10 @@ static inline void tbk_open(tbk_t *tbk) {
   if (id[0] != 't' || id[1] != 'b' || id[2] != 'k')
     wzfatal("%s is not a valid tbk file.\n", tbk->fname);
   
-  fread(&tbk->version, HDR_VERSION, 1, tbk->fh);
-  fread(&tbk->dt, HDR_DATA_TYPE, 1, tbk->fh);
+  fread(&tbk->version,    HDR_VERSION,    1, tbk->fh);
+  fread(&tbk->dtype,      HDR_DATA_TYPE,  1, tbk->fh);
   fread(&tbk->offset_max, HDR_MAX_OFFSET, 1, tbk->fh);
-  fread(&tbk->extra, HDR_EXTRA, 1, tbk->fh);
+  fread(&tbk->extra,      HDR_EXTRA,      1, tbk->fh);
   tbk->offset = 0;
 }
 
@@ -96,14 +109,16 @@ static inline void tbk_open_update(tbk_t *tbk) {
   tbk->offset = 0;
 }
 
-static inline void tbk_write_hdr(int32_t version, data_type_t dt, int64_t n, char *msg, FILE*tbk_out) {
+static inline void tbk_write_hdr(int32_t version, uint64_t dtype, int64_t n, char *msg, FILE*tbk_out) {
   char id[3] = {'t','b','k'};
   fwrite(&id,      HDR_ID,         1, tbk_out);
-  fwrite(&version, HDR_VERSION, 1, tbk_out);
-  fwrite(&dt,      HDR_DATA_TYPE,  1, tbk_out);
+  fwrite(&version, HDR_VERSION,    1, tbk_out);
+  fwrite(&dtype,   HDR_DATA_TYPE,  1, tbk_out);
   fwrite(&n,       HDR_MAX_OFFSET, 1, tbk_out);
   fwrite(msg,      HDR_EXTRA,      1, tbk_out);
 }
+
+void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux);
 
 static inline void tbk_close(tbk_t *tbk) {
   fclose(tbk->fh);
@@ -124,7 +139,7 @@ typedef struct view_conf_t {
 } view_conf_t;
 
 typedef struct tbk_data_t {
-  data_type_t dtype;
+  uint64_t dtype;
   void *data;
   int n;
 } tbk_data_t;

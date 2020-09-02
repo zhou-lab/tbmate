@@ -46,8 +46,12 @@ static void error(const char *format, ...) {
 /* output the i-th data entry */
 void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
 
-  switch(d->dtype) {
-  case  DT_INT2: {
+  switch(DATA_TYPE(d->dtype)) {
+  case DT_INT1: {
+    ksprintf(ks, "\t%d", ((uint8_t*)(d->data))[i]);
+    break;
+  }
+  case DT_INT2: {
     ksprintf(ks, "\t%d", ((uint8_t*)(d->data))[i]);
     break;
   }
@@ -75,7 +79,14 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
     else ksprintf(ks, "\t%f", data);
     break;
   }
-  default: wzfatal("Unrecognized data type: %d.\n", d->dtype);
+  case DT_STRINGF: {
+    char *data = ((char*) (d->data))[i*STRING_MAX(d->type)];
+    kputs(data, ks);
+    break;
+  }
+  case DT_STRINGD: {
+    char *data = ((char*) (d->data))
+  default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(d->dtype));
   }
 }
 
@@ -87,9 +98,20 @@ void tbk_query_n(tbk_t *tbk, int64_t offset, int n, tbk_data_t *data) {
   if (n <= 0) return;
   
   data->n = n;
-  data->dtype = tbk->dt;
+  data->dtype = tbk->dtype;
 
-  switch(tbk->dt) {
+  switch(DATA_TYPE(tbk->dtype)) {
+  case DT_INT1: {
+    tbk->offset = offset/8;                           /* always seek */
+    if(fseek(tbk->fh, offset/8+HDR_TOTALBYTES, SEEK_SET)) wzfatal("File %s cannot be seeked.\n", tbk->fname);
+    
+    int nb = (offset + n) / 8 - offset / 8 + 1;
+    uint8_t *tmp = calloc(nb, 1);
+    fread(tmp, 1, nb, tbk->fh); tbk->offset += n;
+    int i;
+    for (i=0; i<n; ++i) ((uint8_t*)data->data)[i] = (tmp[(offset+i)/8 - offset/8] >> (offset+i)%8) & 0x7;
+    break;
+  }
   case DT_INT2: {
     tbk->offset = offset/4;                           /* always seek */
     if(fseek(tbk->fh, offset/4+HDR_TOTALBYTES, SEEK_SET)) wzfatal("File %s cannot be seeked.\n", tbk->fname);
@@ -148,7 +170,7 @@ void tbk_query_n(tbk_t *tbk, int64_t offset, int n, tbk_data_t *data) {
     fread(data->data, 8, n, tbk->fh); tbk->offset += n;
     break;
   }
-  default: wzfatal("Unrecognized data type: %d.\n", tbk->dt);
+  default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(tbk->dtype));
   }
 }
 
@@ -250,7 +272,7 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
         fputc('\n', out_fh);
       }
       
-      /* ensure_number2(fields[3]); */ // this is slow
+      ensure_number2(fields[3]);
       offset = atoi(fields[3]);
 
       if (offset >= 0 || conf->show_unaddressed) {

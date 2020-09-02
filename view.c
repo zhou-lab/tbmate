@@ -99,13 +99,25 @@ static char **parse_regions(char *regions_fname, char *region, int *nregs) {
   return regs;
 }
 
-void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh) {
+void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char *aux) {
 
   /* when the offset is unfound */
   if (offset < 0) { fputs("\t-1", out_fh); return; }
   if (offset >= tbk->offset_max) {wzfatal("Error: query %d out of range. Wrong idx file?", offset);}
   
-  switch(tbk->dt) {
+  switch(DATA_TYPE(tbk->dtype)) {
+  case DT_INT1: {
+    if(tbk->offset == 0 || offset/8 != tbk->offset-1) { /* need to read? */
+      if(offset/8 != tbk->offset) {                     /* need to seek? */
+        tbk->offset = offset/8;
+        if(fseek(tbk->fh, offset/8+HDR_TOTALBYTES, SEEK_SET))
+          wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      }
+      fread(&(tbk->data), 1, 1, tbk->fh); tbk->offset++;
+    }
+    fprintf(out_fh, "\t%d", ((tbk->data)>>(offset%8)) & 0x7);
+    break;
+  }
   case DT_INT2: {
     if(tbk->offset == 0 || offset/4 != tbk->offset-1) { /* need to read? */
       if(offset/4 != tbk->offset) {                       /* need to seek? */
@@ -172,7 +184,40 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh) {
     else fprintf(out_fh, "\t%f", data);
     break;
   }
-  default: wzfatal("Unrecognized data type: %d.\n", tbk->dt);
+  case DT_STRINGF: {
+    if(offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*STRING_MAX(dtype)+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+
+    if (!aux) aux = malloc(STRING_MAX(dtype)+1);
+    fread(&aux, 1, STRING_MAX(dtype), out);
+    if (aux[STRING_MAX(dtype)-1] != NULL) aux[STRING_MAX(dtype)] = '\0';
+
+    fputs(aux, out_fh);
+    int n = strlen(s);
+    break;
+  }
+  case DT_STRINGD: {
+    if (offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*STRING_MAX(dtype)+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+
+    kstring_t ks = {0};
+    char c;
+    while (1) {
+      fread(&c, 1,1,tbk->fh);
+      if (c) kputc(c, &ks);
+      else break;
+    }
+    if (ks.s) fputs(ks.s, out_fh);
+    free(ks.s);
+    break;
+  }
+  default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(tbk->dtype));
   }
 }
 
@@ -188,7 +233,11 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
   if(!tbx) error("Could not load .tbi/.csi index of %s\n", fname);
   kstring_t str = {0,0,0};
   const char **seq = NULL;
-  char **fields; int nfields;
+  
+  char **fields = NULL;
+  int nfields = -1;
+  char *aux = NULL; char *aux2 = NULL;
+  
   int offset, ii;
   int linenum=0;
   for(i=0; i<nregs; i++) {
@@ -196,7 +245,8 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
     if(!itr) continue;
     while (tbx_itr_next(fp, tbx, itr, &str) >= 0) {
 
-      line_get_fields(str.s, "\t", &fields, &nfields);
+      line_get_fields2(str.s, "\t", &fields, &nfields, &aux);
+      
       if (nfields < 3)
         wzfatal("[%s:%d] Bed file has fewer than 3 columns.\n", __func__, __LINE__);
 
@@ -231,13 +281,15 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
             fprintf(out_fh, "\t%s", fields[ii]);
         }
 
-        for(k=0; k<n_tbks; ++k) tbk_query(&tbks[k], offset, conf, out_fh);
+        for(k=0; k<n_tbks; ++k) tbk_query(&tbks[k], offset, conf, out_fh, aux2);
         fputc('\n', out_fh);
       }
-      free_fields(fields, nfields);
     }
     tbx_itr_destroy(itr);
   }
+
+  free(aux); free(aux2);
+  free_fields(fields, nfields);
   free(seq);
   free(str.s);
   tbx_destroy(tbx);

@@ -40,7 +40,7 @@ static int usage() {
   fprintf(stderr, "Usage: tbmate pack [options] <in.bed> <out.tbk>\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Options:\n");
-  fprintf(stderr, "    -s        int2, int32, int, float, double, ones ([-1,1] up to 3e-5 precision)\n");
+  fprintf(stderr, "    -s        int1, int2, int32, int, float, double, stringf, stringd, ones ([-1,1] up to 3e-5 precision)\n");
   fprintf(stderr, "    -x        optional output of an index file containing address for each record.\n");
   fprintf(stderr, "    -h        This help\n");
   fprintf(stderr, "\n");
@@ -72,15 +72,25 @@ int is_float(char **samples, int n_samples) {
   return 1;
 }
 
-data_type_t data_type(char **samples, int n_samples) {
+int data_type(char **samples, int n_samples) {
   if (is_float(samples, n_samples)) return DT_DOUBLE;
   if (is_integer(samples, n_samples)) return DT_INT32;
-  return DT_NA;
+  return -1;
 }
 
-void tbk_write(char *s, data_type_t dt, FILE *out, int n, uint8_t *aux) {
+void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tmp_out, uint64_t *tmp_out_offset) {
 
-  switch(dt) {
+  switch(DATA_TYPE(dtype)) {
+  case DT_INT1: {
+    uint8_t d;
+    switch(*s) {
+    case '0': d=0; break;
+    case '1': d=1; break;
+    default: wzfatal("Error, non-binary data found: %s\n", s); }
+    *aux |= d << (n&0x7);
+    if((n&0x7)==7) { fwrite(aux, 1, 1, out); *aux=0; }
+    break;
+  }
   case DT_INT2: {
     uint8_t d = atoi(s);
     *aux |= d << ((n%4)*2);
@@ -108,8 +118,22 @@ void tbk_write(char *s, data_type_t dt, FILE *out, int n, uint8_t *aux) {
     fwrite(&d, sizeof(uint16_t), 1, out);
     break;
   }
+  case DT_STRINGF: {
+    int n = strlen(s);
+    if (n > STRING_MAX(dtype)) s[STRING_MAX(dtype)] = 0;
+    fwrite(&s, 1, n, out);
+    if (n < STRING_MAX(dtype)) { fwrite(&s, 1, STRING_MAX(dtype) - n, out); }
+    break;
+  }
+  case DT_STRINGD: {
+    int n = strlen(s) + 1;
+    fwrite(&s, 1, n, tmp_out);
+    fwrite(tmp_out_offset, 8, 1, out);
+    *tmp_out_offset += strlen(s) + 1;
+    break;
+  }
   case DT_NA: wzfatal("Fail to detect data type. Please specify -s explicity.\n"); break;
-  default: wzfatal("Unrecognized data type: %d.\n", dt);
+  default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(dtype));
   }
 }
   
@@ -117,21 +141,26 @@ int main_pack(int argc, char *argv[]) {
 
   int c;
   if (argc<2) return usage();
-  data_type_t dt = DT_NA;
+  uint64_t dtype = DT_NA;
   char *idx_path = NULL;
   char msg[HDR_EXTRA] = {0};
+  uint64_t max_str_length = 64;
   while ((c = getopt(argc, argv, "s:x:m:h"))>=0) {
     switch (c) {
     case 's':
-      if (strcmp(optarg, "int2") == 0) dt = DT_INT2;
-      else if (strcmp(optarg, "int") == 0) dt = DT_INT32;
-      else if (strcmp(optarg, "int32") == 0) dt = DT_INT32;
-      else if (strcmp(optarg, "float") == 0) dt = DT_FLOAT;
-      else if (strcmp(optarg, "double") == 0) dt = DT_DOUBLE;
-      else if (strcmp(optarg, "ones") == 0) dt = DT_ONES;
+      if (strcmp(optarg, "int2") == 0) dtype = DT_INT2;
+      else if (strcmp(optarg, "int") == 0) dtype = DT_INT32;
+      else if (strcmp(optarg, "int32") == 0) dtype = DT_INT32;
+      else if (strcmp(optarg, "float") == 0) dtype = DT_FLOAT;
+      else if (strcmp(optarg, "double") == 0) dtype = DT_DOUBLE;
+      else if (strcmp(optarg, "ones") == 0) dtype = DT_ONES;
+      else if (strcmp(optarg, "string") == 0) dtype = DT_STRINGD;
+      else if (strcmp(optarg, "stringd") == 0) dtype = DT_STRINGD; /* fixed size string */
+      else if (strcmp(optarg, "stringf") == 0) dtype = DT_STRINGF;
       else wzfatal("Unrecognized data type: %s.\n", optarg);
       break;
     case 'x': idx_path = strdup(optarg); break;
+    case 'i': max_str_length = atol(optarg); break;
     case 'm': {
       if (strlen(optarg) > HDR_EXTRA - 1) wzfatal("Message cannot be over %d in length.", HDR_EXTRA);
       strcpy(msg, optarg);
@@ -142,6 +171,10 @@ int main_pack(int argc, char *argv[]) {
     }
   }
 
+  if (dtype == DT_STRINGF) {
+    dtype |= (max_str_length << 8);
+  }
+
   if (optind + 2 > argc) { 
     usage(); 
     wzfatal("Please supply input and output file.\n"); 
@@ -149,7 +182,17 @@ int main_pack(int argc, char *argv[]) {
 
   bed_file_t *bed = init_bed_file(argv[optind++]);
   FILE *tbk_out = NULL;
-  if (optind < argc) tbk_out = fopen(argv[optind++], "wb");
+  if (optind < argc) tbk_out = fopen(argv[optind], "wb");
+
+  char *tmp_fname = NULL;       /* temporary file holding variable length strings */
+  FILE *tmp_out = NULL;
+  uint64_t tmp_out_offset = 0;
+  if (dtype == DT_STRINGD) {
+    tmp_fname = calloc(strlen(argv[optind])+10, 1);
+    strcpy(tmp_fname, argv[optind]);
+    strcat(tmp_fname, "_tmp_");
+    tmp_out = fopen(tmp_fname, "wb");
+  }
     
   bed1_t *b = init_bed1(NULL, NULL);
   /* b->tid = -1; */
@@ -184,29 +227,29 @@ int main_pack(int argc, char *argv[]) {
     }
 
     if (n == 1000) {
-      if (dt == DT_NA) dt = data_type(samples, n);
-      if (tbk_out) tbk_write_hdr(1, dt, n, msg, tbk_out);
+      if (dtype == DT_NA) dtype = data_type(samples, n);
+      if (tbk_out) tbk_write_hdr(1, dtype, n, msg, tbk_out);
       for(i=0; i<n; ++i) {
-        if (tbk_out) tbk_write(samples[i], dt, tbk_out, i, &aux);
+        if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, &tmp_out, &tmp_out_offset);
         free(samples[i]);
       }
     }
-    if (tbk_out) tbk_write(bd, dt, tbk_out, n, &aux);
+    if (tbk_out) tbk_write(bd, dtype, tbk_out, n, &aux, &tmp_out, &tmp_out_offset);
     free(bd);
     n++;
   }
 
   /* if no more than 1000 records */
   if (n <= 1000) {
-    if (dt == DT_NA) dt = data_type(samples, n);
-    if (tbk_out) tbk_write_hdr(1, dt, n, msg, tbk_out);
+    if (dtype == DT_NA) dtype = data_type(samples, n);
+    if (tbk_out) tbk_write_hdr(1, dtype, n, msg, tbk_out);
     for(i=0; i<n; ++i) {
-      if (tbk_out) tbk_write(samples[i], dt, tbk_out, i, &aux);
+      if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, &tmp_out, &tmp_out_offset);
       free(samples[i]);
     }
   }
 
-  if (dt == DT_INT2) { if (tbk_out) fwrite(&aux, 1, 1, tbk_out); aux=0; }
+  if (dtype == DT_INT2) { if (tbk_out) fwrite(&aux, 1, 1, tbk_out); aux=0; }
   
   free_bed1(b, NULL);
   free_bed_file(bed);
@@ -218,6 +261,19 @@ int main_pack(int argc, char *argv[]) {
   /* the actual size */
   fseek(tbk_out, HDR_MAX_OFFSET0, SEEK_SET);
   fwrite(&n,   HDR_MAX_OFFSET, 1, tbk_out);
+
+  if (tmp_out) {
+    fclose(tmp_out);
+    tmp_out = fopen(tmp_fname, "rb");
+    fseek(tbk_out, SEEK_END);
+    char data;
+    for (i=0; i<tmp_out_offset; ++i) {
+      fread(&data, 1, 1, tmp_out);
+      fwrite(&data, 1, 1, tbk_out);
+    }
+    fclose(tmp_out);
+    unlink(tmp_out);
+  }
 
   if (tbk_out) fclose(tbk_out);
   
