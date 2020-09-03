@@ -1,3 +1,7 @@
+
+.PHONY: test clean
+test: test_stringd test_stringf test_float test_double test_int1 test_int2 test_int test_ones
+
 test_stringd:
 	../tbmate pack -s stringd small/string.bed small/string.tbk
 	../tbmate header small/string.tbk
@@ -54,7 +58,38 @@ test_int:
 	../tbmate view -ko small/view_integer2.out small/integer.tbk
 	diff small/view_integer2.out small/integer.bed
 
+test_ones:
+	../tbmate pack -s ones small/ones.bed small/ones.tbk
+	../tbmate header small/ones.tbk
+	../tbmate view -o small/view_ones.out small/ones.tbk
+	paste small/view_ones.out small/ones.bed | awk -f wanding.awk -e 'abs($$4-$$8)>0.001'
+	../tbmate view -ko small/view_ones2.out small/ones.tbk
+	paste small/view_ones.out small/ones.bed | awk -f wanding.awk -e 'abs($$4-$$8)>0.001'
+	diff small/view_ones.out small/view_ones2.out
 
 clean:
 	rm -f small/*.out
 	rm -f small/*.tbk
+
+test_HM450:
+	Rscript HM450.R
+
+clean_HM450:
+	rm -f HM450/tbk/*.tbk
+
+test_EPIC:
+	parallel -j 10 'bedtools intersect -a /mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/EPIC/EPIC.idx.gz -b {} -loj | cut -f1-3,8 | tbmate pack -s float -m /mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/EPIC/EPIC.idx.gz - EPIC/tbk/{/.}.tbk' ::: EPIC/raw/*.txt
+	tbmate view -i ~/references/InfiniumArray/EPIC/EPIC_to_hg38.idx.gz -g chr19 -cd EPIC/tbk/ >EPIC/chr19.out
+
+clean_EPIC:
+	rm -f EPIC/tbk/*.tbk
+
+test_WGBS:
+	parallel -j 10 'bedtools intersect -a /mnt/isilon/zhou_lab/projects/20191221_references/hg38/annotation/cpg/idx.gz -b {} -sorted -loj | cut -f1-3,8 | tbmate pack -m "/mnt/isilon/zhou_lab/projects/20191221_references/hg38/annotation/cpg/idx.gz" -s ones - WGBS/tbk/{/.}.tbk' ::: WGBS/raw/*.gz
+	tbmate view -cd -g chr19:246460-346460 WGBS/tbk/TCGA_BLCA_A1AG_cpg.tbk WGBS/tbk/TCGA_BLCA_A20V_cpg.tbk >WGBS/1.out
+	tbmate view -cd -g chr19:246460-346460 -p 3 WGBS/tbk/*.tbk >WGBS/2.out
+	tbmate view -cdi indices/hg38_to_EPIC_idx.gz WGBS/tbk/TCGA_BLCA_A1AG_cpg.tbk WGBS/tbk/TCGA_BLCA_A20V_cpg.tbk >WGBS/3.out
+	tbmate view -ac -i ~/references/hg38/annotation/cpg/hg38_to_EPIC_idx.gz tbk/*.tbk >WGBS/4.out
+	tbmate view -c -g cg00001638,cg00013374,cg00012123,cg00006867,rs2468330,ch.9.2265413R,ch.9.2295001F -i ~/references/hg38/annotation/cpg/hg38_to_EPIC_idx.gz tbk/*.tbk >WGBS/5.out
+
+

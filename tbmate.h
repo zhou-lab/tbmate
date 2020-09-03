@@ -54,9 +54,9 @@
 #define DT_INT32   3
 #define DT_FLOAT   4
 #define DT_DOUBLE  5
-#define DT_ONES    6
-#define DT_STRINGD 7
-#define DT_STRINGF 8
+#define DT_STRINGD 6
+#define DT_STRINGF 7
+#define DT_ONES    30
 #define DT_NA      99
 
 #define DATA_TYPE(d) ((d)&0xff)

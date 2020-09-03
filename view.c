@@ -178,7 +178,7 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
       tbk->offset = offset;
     }
     
-    float data;
+    double data;
     fread(&data, 8, 1, tbk->fh); tbk->offset++;
     if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
     else fprintf(out_fh, "\t%f", data);

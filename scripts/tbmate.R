@@ -1,27 +1,48 @@
-dtypes <- c('NA', 'INT2', 'INT32', 'FLOAT', 'DOUBLE', 'ONES')
-dtype_size <- c('INT2'=1, 'INT32'=4, 'FLOAT'=4, 'DOUBLE'=8, 'ONES'=2)
-dtype_type <- c('INT2'='integer', 'INT32'='integer', 'FLOAT'='numeric', 'DOUBLE'='numeric', 'ONES'='numeric')
+dtypes <-     c('INT1'=1, 'INT2'=2, 'INT32'=3, 'FLOAT'=4, 'DOUBLE'=5, 'STRINGD'=6, 'STRINGF'=7)
+dtype_size <- c('INT1'=1, 'INT2'=1, 'INT32'=4, 'FLOAT'=4, 'DOUBLE'=8, 'STRINGD'=8, 'STRINGF'=8)
+dtype_type <- c('INT1'='integer', 'INT2'='integer', 'INT32'='integer', 'FLOAT'='numeric', 'DOUBLE'='numeric', 'STRINGD'='character', 'STRINGF'='character')
 MAX_DOUBLE16 <- bitwShiftL(1,15)-2 # 32766
 HDR_ID         <- 3
 HDR_VERSION    <- 4
-HDR_DATA_TYPE  <- 4
+HDR_DATA_TYPE  <- 8
 HDR_MAX_OFFSET <- 8
-HDR_EXTRA      <- 493
-HDR_TOTALBYTES <- 512
+HDR_EXTRA      <- 8169
+HDR_TOTALBYTES <- 8192
 
 tbk_hdr <- function(tbk_file) {
     id <- rawToChar(readBin(tbk_file, raw(), 3, 1))
     stopifnot(id == "tbk")
     tbk_version <- readBin(tbk_file, integer(), 1, 4)
-    dtype <- dtypes[readBin(tbk_file, integer(), 1, 4)+1]
+    dtype <- readBin(tbk_file, integer(), 1, 8)
     num <- readBin(tbk_file, integer(), 1, 8)
     msg <- rawToChar(readBin(tbk_file, raw(), HDR_EXTRA, 1))
     out <- structure(list(
         tbk_version = tbk_version,
-        dtype = dtype,
+        dtype = names(dtypes)[bitwAnd(dtype, 0xff)],
+        smax = bitwShiftR(dtype,8),
         num = num,
         msg = msg
     ), class='tbk')
+}
+
+tbk_hdr_write <- function(out_file, data, dtype = "FLOAT", msg = "", tbk_version = 1) {
+    writeBin(charToRaw('tbk'), out_file, 1)
+    writeBin(as.integer(tbk_version), out_file, 4)
+
+    dt <- as.integer(dtypes[dtype])
+    if (dtype == "STRINGF") dt <- bitwOr(dt, bitwShiftL(max(sapply(data, nchar)),8))
+    
+    writeBin(dt, out_file, 8);
+    writeBin(as.integer(length(data)), out_file, 8)
+    msgRaw <- charToRaw(msg)
+    if (length(msgRaw) > HDR_EXTRA) {
+        msgRaw <- msgRaw[1:HDR_EXTRA]
+        warning(sprintf("msg longer than %d, truncated.", HDR_EXTRA))
+    }
+    if (length(msgRaw) < HDR_EXTRA) {
+        msgRaw <- c(msgRaw, rep(as.raw('0'), HDR_EXTRA - length(msgRaw)))
+    }
+    writeBin(msgRaw, out_file, 1)
 }
 
 #' retrieve tbk headers
@@ -66,16 +87,28 @@ tbk_data_addr <- function(tbk_fnames, idx_addr) {
                 curr_offset <- offset
             }
             curr_offset <<- curr_offset + 1
-            if (hdr$dtype == "ONES") {
-                (as.numeric(readBin(in_file, 'integer', 1, 2, signed=FALSE)) - MAX_DOUBLE16) / MAX_DOUBLE16
-            } else if (hdr$dtype == "INT2") { # FIXME
-                readBin(in_file, "integer", 1, 4)
+
+
+            if (hdr$dtype == "INT1") {
+                d0 <<- bitwOr(bitwShiftL(d0, k%%8), bitwAnd(data[idx,k], 0x1))
+                readBin(in_file, "integer", 1, 1)
+                ## as.raw(d0), out_file, 
+                ## if (k%%8 == 0) {
+                ##     d0 <<- 0
+                ## }
+            } else if (hdr$dtype == "INT2") {
+                d0 <<- bitwOr(bitwShiftL(d0, 2*(k%%4)), bitwAnd(data[idx,k], 0x3))
+                readBin(in_file, "integer", 1, 1)
+                ## writeBin(as.raw(d0), out_file, 1)
+                ## d0 <<- 0
             } else if (hdr$dtype == "FLOAT") {
                 readBin(in_file, 'numeric', 1, 4)
             } else if (hdr$dtype == "DOUBLE") {
                 readBin(in_file, 'numeric', 1, 8)
             } else if (hdr$dtype == "INT32") {
                 readBin(in_file, "integer", 1, 4)
+            } else if (hdr$dtype == "ONES") {
+                (as.numeric(readBin(in_file, 'integer', 1, 2, signed=FALSE)) - MAX_DOUBLE16) / MAX_DOUBLE16
             } else {
                 stop("Unrecognized data type.\n")
             }
@@ -177,10 +210,10 @@ tbk_data <- function(
 #' @param out_dir output directory, if given the out_fname is set to
 #' out_dir/colnames(data).tbk
 #' @param out_fname output tbk file name
-#' @param dtype data type, INT2, INT32, FLOAT, DOUBLE, ONES
+#' @param dtype data type, INT1, INT2, INT32, FLOAT, DOUBLE, STRINGD, STRINGF
 #' @param idx_fname index file name
 #' @export
-tbk_pack <- function(data, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_fname = NULL, tbk_version = 1, msg="") {
+tbk_pack <- function(data, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_fname = NULL, tbk_version = 1, msg="", na.token = -1.0) {
     if (is.null(out_dir)) {
         if (is.null(out_fname)) {
             stop("Please provide out_fname.\n")
@@ -206,7 +239,8 @@ tbk_pack <- function(data, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_
             file.path(out_dir, 'idx.gz.tbi'))
     }
     
-    idx_addr <- sort(with(read.table(gzfile(idx_fname), header=F, stringsAsFactors=FALSE), setNames(V4,V1)))
+    idx_addr <- sort(with(read.table(gzfile(idx_fname), header=F,
+        stringsAsFactors=FALSE), setNames(V4,V1)))
     
     ## if data is a single numeric vector
     if (is.null(dim(data))) {
@@ -215,38 +249,41 @@ tbk_pack <- function(data, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_
         if (is.null(out_fname)) stop("Please provide out_fname.\n");
     }
 
+    d0 <- 0
     tmp <- lapply(seq_len(ncol(data)), function(k) {
         fname <- colnames(data)[k]
         idx <- match(names(idx_addr), rownames(data))
-        d1 <- ifelse(is.na(idx), -1, data[idx,k])
+        d1 <- ifelse(is.na(idx), na.token, data[idx,k])
 
         out_file <- file(file.path(out_dir, paste0(fname, '.tbk')),'wb')
         on.exit(close(out_file))
-        
-        writeBin(charToRaw('tbk'), out_file, 1)
-        writeBin(as.integer(tbk_version), out_file, 4)
-        writeBin(as.integer(which(dtypes == dtype)-1), out_file, 4);
-        writeBin(as.integer(length(d1)), out_file, 8)
-        msgRaw <- charToRaw(msg)
-        if (length(msgRaw) > HDR_EXTRA) {
-            msgRaw <- msgRaw[1:HDR_EXTRA]
-            warning(sprintf("msg longer than %d, truncated.", HDR_EXTRA))
-        }
-        if (length(msgRaw) < HDR_EXTRA) {
-            msgRaw <- c(msgRaw, rep(as.raw('0'), HDR_EXTRA - length(msgRaw)))
-        }
-        writeBin(msgRaw, out_file, 1)
 
-        if (dtype == "ONES") {
-            writeBin(as.integer(round((d1 + 1.0) * MAX_DOUBLE16)), out_file, 2);
+        tbk_hdr_write(out_file, d1, dtype = dtype, msg = msg, tbk_version = tbk_version)
+
+        if (dtype == "INT1") {
+            d0 <<- bitwOr(bitwShiftL(d0, k%%8), bitwAnd(data[idx,k], 0x1))
+            if (k%%8 == 0) {
+                writeBin(as.raw(d0), out_file, 1)
+                d0 <<- 0
+            }
+        } else if (dtype == "INT2") {
+            d0 <<- bitwOr(bitwShiftL(d0, 2*(k%%4)), bitwAnd(data[idx,k], 0x3))
+            if (k%%4 == 0) {
+                writeBin(as.raw(d0), out_file, 1)
+                d0 <<- 0
+            }
+        } else if (dtype == "INT32") {
+            writeBin(as.integer(d1), out_file, 4)
         } else if (dtype == "FLOAT") {
             writeBin(d1, out_file, 4)
         } else if (dtype == 'DOUBLE') {
             writeBin(d1, out_file, 8)
-        } else if (dtype == "INT32") {
-            writeBin(as.integer(d1), out_file, 4)
-        } else if (dtype == "INT2") { # FIXME
-            writeBin(as.integer(d1), out_file, 4)
+        } else if (dtype == "STRINGF") {
+            stop("String packing not supported in R yet. Please use the command line.")
+        } else if (dtype == "STRINGD") {
+            stop("String packing not supported in R yet. Please use the command line.")
+        }  else if (dtype == "ONES") {
+            writeBin(as.integer(round((d1 + 1.0) * MAX_DOUBLE16)), out_file, 2);
         } else {
             stop("Unrecognized data type.\n")
         }
