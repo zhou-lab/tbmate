@@ -66,9 +66,12 @@ Here are the function options:
 Usage: tbmate pack [options] <in.bed> <out.tbk>
 
 Options:
-    -s        int2, int32, int, float, double, ones ([-1,1] up to 3e-5 precision)
+    -s        int1, int2, int32, int, float, double, stringf, stringd, ones ([-1,1] up to 3e-5 precision)
     -x        optional output of an index file containing address for each record.
+    -m        optional message, it will also be used to locate index file.
     -h        This help
+
+Note, in.bed is an index-ordered bed file. Column 4 will be made a .tbk file.
 ```
 
 ### View .tbk files
