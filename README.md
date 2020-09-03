@@ -1,4 +1,4 @@
-# TabixMate: nimble storage and retrieval of multifarious large-scale genomic data
+# TabixMate: nimble storage of multifarious large-scale genomic data
 
 [![Travis-CI Build Status](https://travis-ci.org/zhou-lab/tbmate.svg?branch=master)](https://travis-ci.org/zhou-lab/tbmate)
 
