@@ -1,0 +1,10 @@
+language: c
+
+matrix:
+  - linux
+  - osx
+
+script:
+  - make
+
+compiler: gcc
