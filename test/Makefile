@@ -92,4 +92,5 @@ test_WGBS:
 	tbmate view -ac -i ~/references/hg38/annotation/cpg/hg38_to_EPIC_idx.gz tbk/*.tbk >WGBS/4.out
 	tbmate view -c -g cg00001638,cg00013374,cg00012123,cg00006867,rs2468330,ch.9.2265413R,ch.9.2295001F -i ~/references/hg38/annotation/cpg/hg38_to_EPIC_idx.gz tbk/*.tbk >WGBS/5.out
 
-
+clean_WGBS:
+	rm -f WGBS/tbk/*.tbk

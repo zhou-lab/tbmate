@@ -45,7 +45,7 @@ static int usage() {
   fprintf(stderr, "    -m        optional message, it will also be used to locate index file.\n");
   fprintf(stderr, "    -h        This help\n");
   fprintf(stderr, "\n");
-  fprintf(stderr, "Note, in.bed is a position sorted bed file. Column 4 will be made a .tbk file.\n");
+  fprintf(stderr, "Note, in.bed is an index-ordered bed file. Column 4 will be made a .tbk file.\n");
   fprintf(stderr, "\n");
 
   return 1;
