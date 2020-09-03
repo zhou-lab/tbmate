@@ -42,6 +42,7 @@ static int usage() {
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "    -s        int1, int2, int32, int, float, double, stringf, stringd, ones ([-1,1] up to 3e-5 precision)\n");
   fprintf(stderr, "    -x        optional output of an index file containing address for each record.\n");
+  fprintf(stderr, "    -m        message column, it will also be used to locate index file.\n");
   fprintf(stderr, "    -h        This help\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Note, in.bed is a position sorted bed file. Column 4 will be made a .tbk file.\n");
