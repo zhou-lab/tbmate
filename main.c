@@ -44,7 +44,7 @@ static int usage()
   fprintf(stderr, "Command:\n");
   fprintf(stderr, "     pack         pack data to tbk\n");
   fprintf(stderr, "     view         view data stored in tbk\n");
-  fprintf(stderr, "     header       view data header in tbk\n");
+  fprintf(stderr, "     header       view and set tbk data header\n");
   fprintf(stderr, "\n");
 
   return 1;
