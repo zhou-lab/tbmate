@@ -1,6 +1,7 @@
 # TabixMate: nimble storage of multifarious large-scale genomic data
 
 [![Travis-CI Build Status](https://travis-ci.org/zhou-lab/tbmate.svg?branch=master)](https://travis-ci.org/zhou-lab/tbmate)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/zhou-lab/tbmate)
 
 tbmate (TabixMate) works with [Tabix](http://www.htslib.org/doc/tabix.html) - the Swiss-knife tool for random accessing genomic data. However, there are 3 limitations of applying tabix to large genome-wide data sets.
 
