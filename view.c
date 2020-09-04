@@ -25,6 +25,8 @@
 **/
 
 #include <dirent.h>
+#include <stdlib.h>
+#include <limits.h>
 #include "tbmate.h"
 #include "wzmisc.h"
 #include "wzio.h"
@@ -412,11 +414,22 @@ int main_view(int argc, char *argv[]) {
     /* try read the header names */
     for(i=0; i<n_tbks; ++i) {
       tbk_open(&tbks[i]);
-      FILE *fp = fopen(tbks[i].extra,"r");
-      if(fp) {
-        idx_fname = strdup(tbks[i].extra);
-        tbk_close(&tbks[i]);
-        break;
+
+      /* get real path */
+      char buf[PATH_MAX];
+      char *tmp = strdup(tbks[i].fname);
+      strcpy(buf, dirname(tmp));
+      free(tmp);
+      strcat(buf, "/");
+      strcat(buf, tbks[i].extra);
+      char *res = realpath(buf, NULL);
+      if (res) {
+        FILE *fp = fopen(res,"r");
+        if(fp) {
+          idx_fname = res;
+          tbk_close(&tbks[i]);
+          break;
+        }
       }
       tbk_close(&tbks[i]);
     }
