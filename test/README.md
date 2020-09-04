@@ -42,7 +42,7 @@ cd test
 ```sh
 # note the index is provided as a relative path, it will remain valid as long as out.tbk is kept relatively
 # same with respective to indices/hg38.idx.gz, one can also provide an absolute path
-./tbmate pack -s float -m "indices/hg38.idx.gz" WGBS/raw/TCGA_BLCA_A13J_cpg.gz tmp.tbk
+./tbmate pack -s float -m "indices/hg38.idx.gz" WGBS/raw/TCGA_BLCA_A13J_cpg.gz out.tbk
 
 # view header
 ./tbmate header out.tbk
