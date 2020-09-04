@@ -2,16 +2,17 @@
 ## Download executables here
 [https://github.com/zhou-lab/tbmate/releases](https://github.com/zhou-lab/tbmate/releases)
 
+Download test data [here](https://www.dropbox.com/s/traeqvfqf3qtat4/test.zip?dl=1)
+
 Or,
 ```sh
 wget -O tbmate "https://github.com/zhou-lab/tbmate/releases/download/1.1.20200904/tbmate_linux_amd64"
 ## or mac
 wget -O tbmate "https://github.com/zhou-lab/tbmate/releases/download/1.1.20200904/tbmate_darwin_amd64"
 
-wget -O test ""
+## unzip test data
 unzip test.zip
 cd test
-
 ```
 
 
