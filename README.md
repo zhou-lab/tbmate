@@ -20,6 +20,9 @@ tbmate is meant to solve/alleviate these challenges by de-coupling the data from
 
 tbmate is currently implemented in C and R. It can easily be extended to other programming languages.
 
+## Quick start
+[https://github.com/zhou-lab/tbmate/blob/master/test/README.md](https://github.com/zhou-lab/tbmate/blob/master/test/README.md)
+
 ## "Column-wise operation" by file selection.
 
 Each sample is stored in a file. Data sets can be easily assembled by selecting files.
