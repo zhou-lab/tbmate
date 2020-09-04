@@ -424,11 +424,18 @@ int main_view(int argc, char *argv[]) {
       strcat(buf, tbks[i].extra);
       char *res = realpath(buf, NULL);
       if (res) {
-        FILE *fp = fopen(res,"r");
-        if(fp) {
-          idx_fname = res;
-          tbk_close(&tbks[i]);
-          break;
+        DIR *d = opendir(res);
+        if (d) {               /* exclude the possibility that it's a folder */
+          closedir(d);
+        } else {
+          /* FILE *fp = fopen(res,"r"); */
+          htsFile *fp = hts_open(res,"r");
+          if(fp) {
+            idx_fname = res;
+            tbk_close(&tbks[i]);
+            hts_close(fp);
+            break;
+          }
         }
       }
       tbk_close(&tbks[i]);
