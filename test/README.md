@@ -3,9 +3,9 @@
 [https://github.com/zhou-lab/tbmate/releases](https://github.com/zhou-lab/tbmate/releases)
 
 ```sh
-wget -O tbmate "https://github.com/zhou-lab/tbmate/releases/download/1.1.20200904/tbmate_linux_amd64"
+wget -O tbmate "https://github.com/zhou-lab/tbmate/releases/download/1.2.20200904/tbmate_linux_amd64"
 ## or mac
-wget -O tbmate "https://github.com/zhou-lab/tbmate/releases/download/1.1.20200904/tbmate_darwin_amd64"
+wget -O tbmate "https://github.com/zhou-lab/tbmate/releases/download/1.2.20200904/tbmate_darwin_amd64"
 
 chmod a+x tbmate
 ```
