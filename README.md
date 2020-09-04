@@ -1,6 +1,7 @@
-# TabixMate: nimble storage and retrieval of multifarious large-scale genomic data
+# TabixMate: nimble storage of multifarious genomic data
 
 [![Travis-CI Build Status](https://travis-ci.org/zhou-lab/tbmate.svg?branch=master)](https://travis-ci.org/zhou-lab/tbmate)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/zhou-lab/tbmate)
 
 tbmate (TabixMate) works with [Tabix](http://www.htslib.org/doc/tabix.html) - the Swiss-knife tool for random accessing genomic data. However, there are 3 limitations of applying tabix to large genome-wide data sets.
 
@@ -163,10 +164,3 @@ tbmate header input.tbk
 ```
 
 The header subcommand will output the header inforamtion
-
-Currently tbmate supports the following data types
-1. INT2: 2 bits
-2. INT32: 4 bytes
-3. FLOAT: 4 bytes
-4. DOUBLE: 8 bytes
-5. ONES: 2 bytes, low precision (3e-5) storage for [-1,1] real number.
