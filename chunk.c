@@ -327,7 +327,7 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
         kputs(fields[1], ks); kputc('\t', ks);
         kputs(fields[2], ks);
         if (conf->print_all) {
-          for (ii=3; ii<nfields; ++i)
+          for (ii=3; ii<nfields; ++ii)
             ksprintf(ks, "\t%s", fields[ii]);
         }
         offsets[index_chunk_end - index_chunk_beg - 1] = offset;

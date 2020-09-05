@@ -83,7 +83,7 @@ void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tm
 
   switch(DATA_TYPE(dtype)) {
   case DT_INT1: {
-    uint8_t d;
+    uint8_t d = 0;
     switch(*s) {
     case '0': d=0; break;
     case '1': d=1; break;

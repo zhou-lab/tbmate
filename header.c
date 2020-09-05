@@ -45,7 +45,8 @@ int main_header(int argc, char *argv[]) {
         fprintf(stderr, "[Warning] Message too long, truncated to %d:\n%s", HDR_EXTRA-1, msg);
         msg[HDR_EXTRA-1] = 0;
       }
-      fwrite(msg, HDR_EXTRA, 1, tbk.fh);
+      fwrite(msg, strlen(msg), 1, tbk.fh);
+      /* fwrite(msg, HDR_EXTRA, 1, tbk.fh); */
       tbk_close(&tbk);
 
     } else {
@@ -66,7 +67,7 @@ int main_header(int argc, char *argv[]) {
       }
       fprintf(stdout, "Number of data: %"PRId64"\n", tbk.offset_max);
       fputs("Message: ", stdout);
-      if (tbk.extra) fputs(tbk.extra, stdout);
+      if (tbk.extra[0]) fputs(tbk.extra, stdout);
       fputs("\n\n", stdout);
       tbk_close(&tbk);
     }
