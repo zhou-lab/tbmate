@@ -35,13 +35,14 @@ void parse_data(bed1_t *b, char **fields, int nfields) {
   b->data = strdup(fields[3]);
 }
 
-static int usage() {
+static int usage(conf_pack_t *conf) {
   fprintf(stderr, "\n");
   fprintf(stderr, "Usage: tbmate pack [options] <in.bed> <out.tbk>\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Options:\n");
   fprintf(stderr, "    -s        int1, int2, int32, int, float, double, stringf, stringd, ones ([-1,1] up to 3e-5 precision)\n");
   fprintf(stderr, "    -x        optional output of an index file containing address for each record.\n");
+  fprintf(stderr, "    -n        integer number for nan or '.' [%f]. \n", conf->nan),
   fprintf(stderr, "    -m        optional message, it will also be used to locate index file.\n");
   fprintf(stderr, "    -h        This help\n");
   fprintf(stderr, "\n");
@@ -79,7 +80,7 @@ int data_type(char **samples, int n_samples) {
   return -1;
 }
 
-void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tmp_out, uint64_t *tmp_out_offset) {
+void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tmp_out, uint64_t *tmp_out_offset, conf_pack_t *conf) {
 
   switch(DATA_TYPE(dtype)) {
   case DT_INT1: {
@@ -99,22 +100,30 @@ void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tm
     break;
   }
   case DT_INT32: {
-    int32_t d = atoi(s);
+    int32_t d;
+    if (s[0] == '.' && s[1] == '\0') d = conf->nan;
+    else d = atoi(s);
     fwrite(&d, sizeof(int32_t), 1, out);
     break;
   }
   case DT_FLOAT: {
-    float d = atof(s);
+    float d;
+    if (s[0] == '.' && s[1] == '\0') d = conf->nan;
+    else d = atof(s);
     fwrite(&d, sizeof(float), 1, out);
     break;
   }
   case DT_DOUBLE: {
-    double d = atof(s);
+    float d = atof(s);
+    if (s[0] == '.' && s[1] == '\0') d = conf->nan;
+    else d = atof(s);
     fwrite(&d, sizeof(double), 1, out);
     break;
   }
   case DT_ONES: {
-    uint16_t d = float_to_uint16(atof(s));
+    uint16_t d;
+    if (s[0] == '.' && s[1] == '\0') d = conf->nan;
+    else d = float_to_uint16(atof(s));
     fwrite(&d, sizeof(uint16_t), 1, out);
     break;
   }
@@ -140,13 +149,16 @@ void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tm
   
 int main_pack(int argc, char *argv[]) {
 
+  conf_pack_t conf = {0};
+  conf.nan = -1.0;
+  
   int c;
-  if (argc<2) return usage();
+  if (argc<2) return usage(&conf);
   uint64_t dtype = DT_NA;
   char *idx_path = NULL;
   char msg[HDR_EXTRA] = {0};
   uint64_t max_str_length = 64;
-  while ((c = getopt(argc, argv, "s:x:m:h"))>=0) {
+  while ((c = getopt(argc, argv, "s:x:m:n:h"))>=0) {
     switch (c) {
     case 's':
       if (strcmp(optarg, "int1") == 0)         dtype = DT_INT1;
@@ -162,14 +174,15 @@ int main_pack(int argc, char *argv[]) {
       else wzfatal("Unrecognized data type: %s.\n", optarg);
       break;
     case 'x': idx_path = strdup(optarg); break;
+    case 'n': conf.nan = atof(optarg); break;
     case 'i': max_str_length = atol(optarg); break;
     case 'm': {
       if (strlen(optarg) > HDR_EXTRA - 1) wzfatal("Message cannot be over %d in length.", HDR_EXTRA);
       strcpy(msg, optarg);
       break;
     }
-    case 'h': return usage(); break;
-    default: usage(); wzfatal("Unrecognized option: %c.\n", c);
+    case 'h': return usage(&conf); break;
+    default: usage(&conf); wzfatal("Unrecognized option: %c.\n", c);
     }
   }
 
@@ -178,7 +191,7 @@ int main_pack(int argc, char *argv[]) {
   }
 
   if (optind + 2 > argc) { 
-    usage(); 
+    usage(&conf); 
     wzfatal("Please supply input and output file.\n"); 
   }
 
@@ -232,11 +245,11 @@ int main_pack(int argc, char *argv[]) {
       if (dtype == DT_NA) dtype = data_type(samples, n);
       if (tbk_out) tbk_write_hdr(1, dtype, n, msg, tbk_out);
       for(i=0; i<n; ++i) {
-        if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset);
+        if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset, &conf);
         free(samples[i]);
       }
     }
-    if (tbk_out) tbk_write(bd, dtype, tbk_out, n, &aux, tmp_out, &tmp_out_offset);
+    if (tbk_out) tbk_write(bd, dtype, tbk_out, n, &aux, tmp_out, &tmp_out_offset, &conf);
     free(bd);
     n++;
   }
@@ -246,7 +259,7 @@ int main_pack(int argc, char *argv[]) {
     if (dtype == DT_NA) dtype = data_type(samples, n);
     if (tbk_out) tbk_write_hdr(1, dtype, n, msg, tbk_out);
     for(i=0; i<n; ++i) {
-      if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset);
+      if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset, &conf);
       free(samples[i]);
     }
   }

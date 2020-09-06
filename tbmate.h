@@ -118,7 +118,11 @@ static inline void tbk_write_hdr(int32_t version, uint64_t dtype, int64_t n, cha
   fwrite(msg,      HDR_EXTRA,      1, tbk_out);
 }
 
-void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE*tmp_out, uint64_t *tmp_out_offset);
+typedef struct conf_pack_t {
+  float nan;
+} conf_pack_t;
+
+void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE*tmp_out, uint64_t *tmp_out_offset, conf_pack_t *conf);
 
 static inline void tbk_close(tbk_t *tbk) {
   fclose(tbk->fh);
