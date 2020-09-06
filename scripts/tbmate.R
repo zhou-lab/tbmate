@@ -120,9 +120,9 @@ tbk_data0 <- function(tbk_fnames, idx_addr, max_addr, max_source) {
 
     ## read whole data set only if there are too many addresses but too small source data
     if (tbk_hdrs(tbk_fnames[1])[[1]]$num < max_source && length(idx_addr) < max_addr) {
-        tbk_data_bulk(tbk_fnames, idx_addr)
-    } else {
         tbk_data_addr(tbk_fnames, idx_addr)
+    } else {
+        tbk_data_bulk(tbk_fnames, idx_addr)
     }
 }
 
