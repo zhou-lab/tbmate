@@ -417,11 +417,15 @@ int main_view(int argc, char *argv[]) {
 
       /* get real path */
       char buf[PATH_MAX];
-      char *tmp = strdup(tbks[i].fname);
-      strcpy(buf, dirname(tmp));
-      free(tmp);
-      strcat(buf, "/");
-      strcat(buf, tbks[i].extra);
+      if (tbks[i].extra[0] == '/') {
+        strcpy(buf, tbks[i].extra);
+      } else {
+        char *tmp = strdup(tbks[i].fname);
+        strcpy(buf, dirname(tmp));
+        free(tmp);
+        strcat(buf, "/");
+        strcat(buf, tbks[i].extra);
+      }
       char *res = realpath(buf, NULL);
       if (res) {
         DIR *d = opendir(res);
