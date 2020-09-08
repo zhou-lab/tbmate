@@ -10,7 +10,7 @@ wget -O tbmate "https://github.com/zhou-lab/tbmate/releases/download/1.4.2020090
 chmod a+x tbmate
 ```
 
-## Download test data [here](https://www.dropbox.com/s/traeqvfqf3qtat4/test.zip?dl=1)
+## Download test data [here](https://www.dropbox.com/s/a8phhubwvdblkan/test.zip?dl=1)
 
 ```sh
 ## unzip test data
