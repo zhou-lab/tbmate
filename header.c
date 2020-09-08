@@ -43,9 +43,9 @@ int main_header(int argc, char *argv[]) {
       /* truncate if too long */
       if (strlen(msg) >= HDR_EXTRA-1) {
         fprintf(stderr, "[Warning] Message too long, truncated to %d:\n%s", HDR_EXTRA-1, msg);
-        msg[HDR_EXTRA-1] = 0;
+        msg[HDR_EXTRA-1] = '\0';
       }
-      fwrite(msg, strlen(msg), 1, tbk.fh);
+      fwrite(msg, strlen(msg)+1, 1, tbk.fh);
       /* fwrite(msg, HDR_EXTRA, 1, tbk.fh); */
       tbk_close(&tbk);
 

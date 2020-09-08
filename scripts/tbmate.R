@@ -258,6 +258,9 @@ tbk_pack <- function(data, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_
         out_file <- file(file.path(out_dir, paste0(fname, '.tbk')),'wb')
         on.exit(close(out_file))
 
+        if (length(msg) == 0) {
+            msg = idx_fname
+        }
         tbk_hdr_write(out_file, d1, dtype = dtype, msg = msg, tbk_version = tbk_version)
 
         if (dtype == "INT1") {
