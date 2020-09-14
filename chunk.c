@@ -67,12 +67,6 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
     else ksprintf(ks, "\t%f", data);
     break;
   }
-  case DT_ONES: {
-    float data = ((float*) (d->data))[i];
-    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
-    else ksprintf(ks, "\t%.*f", conf->precision, data);
-    break;
-  }
   case DT_DOUBLE: {
     double data = ((double*) (d->data))[i];
     if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
@@ -88,6 +82,28 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
     char *data = ((char**) (d->data))[i];
     kputc('\t', ks); kputs(data, ks);
     free(data);
+    break;
+  }
+  case DT_ONES: {
+    float data = ((float*) (d->data))[i];
+    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
+    else ksprintf(ks, "\t%.*f", conf->precision, data);
+    break;
+  }
+  case DT_FLOAT_INT: {
+    float data = ((float*) (d->data))[i*2];
+    int data2 = ((int32_t*) (d->data))[i*2+1];
+    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
+    else ksprintf(ks, "\t%f", data);
+    ksprintf(ks, "\t%d", data2);
+    break;
+  }
+  case DT_FLOAT_FLOAT: {
+    float data = ((float*) (d->data))[i*2];
+    float data2 = ((float*) (d->data))[i*2+1];
+    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
+    else ksprintf(ks, "\t%f", data);
+    ksprintf(ks, "\t%f", data2);
     break;
   }
   default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(d->dtype));
@@ -155,21 +171,6 @@ void tbk_query_n(tbk_t *tbk, int64_t offset, int n, tbk_data_t *data) {
     fread(data->data, 4, n, tbk->fh); tbk->offset += n;
     break;
   }
-  case DT_ONES: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*2+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-    data->data = realloc(data->data, 4*n);
-
-    uint16_t *tmp = calloc(n, 2);
-    fread(tmp, 2, n, tbk->fh); tbk->offset += n;
-    int ii;
-    for (ii=0; ii<n; ++ii) ((float*)data->data)[ii] = uint16_to_float(tmp[ii]);
-    free(tmp);
-    break;
-  }
   case DT_DOUBLE: {
     if(offset != tbk->offset) {
       if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
@@ -215,6 +216,43 @@ void tbk_query_n(tbk_t *tbk, int64_t offset, int n, tbk_data_t *data) {
     }
     tbk->offset = -1; // need to be reset
     free(string_offsets);
+    break;
+  }
+  case DT_ONES: {
+    if(offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*2+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+    data->data = realloc(data->data, 4*n);
+
+    uint16_t *tmp = calloc(n, 2);
+    fread(tmp, 2, n, tbk->fh); tbk->offset += n;
+    int ii;
+    for (ii=0; ii<n; ++ii) ((float*)data->data)[ii] = uint16_to_float(tmp[ii]);
+    free(tmp);
+    break;
+  }
+  case DT_FLOAT_INT: {
+    if(offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+
+    data->data = realloc(data->data, 8*n);
+    fread(data->data, 8, n, tbk->fh); tbk->offset += n;
+    break;
+  }
+  case DT_FLOAT_FLOAT: {
+    if(offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+
+    data->data = realloc(data->data, 8*n);
+    fread(data->data, 8, n, tbk->fh); tbk->offset += n;
     break;
   }
   default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(tbk->dtype));

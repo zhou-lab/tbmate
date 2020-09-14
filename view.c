@@ -158,21 +158,6 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     else fprintf(out_fh, "\t%f", data);
     break;
   }
-  case DT_ONES: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*2+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-    
-    uint16_t data;
-    fread(&data, 2, 1, tbk->fh); tbk->offset++;
-    float dataf = uint16_to_float(data);
-    if (conf->dot_for_negative && dataf < 0) fputs("\t.", out_fh);
-    else fprintf(out_fh, "\t%.*f", conf->precision, dataf);
-    /* fprintf(out_fh, "\t%d", data); */
-    break;
-  }
   case DT_DOUBLE: {
     if(offset != tbk->offset) {
       if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
@@ -225,6 +210,49 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     free(ks.s);
 
     tbk->offset = -1; // need to be reset
+    break;
+  }
+  case DT_ONES: {
+    if(offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*2+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+    
+    uint16_t data;
+    fread(&data, 2, 1, tbk->fh); tbk->offset++;
+    float dataf = uint16_to_float(data);
+    if (conf->dot_for_negative && dataf < 0) fputs("\t.", out_fh);
+    else fprintf(out_fh, "\t%.*f", conf->precision, dataf);
+    /* fprintf(out_fh, "\t%d", data); */
+    break;
+  }
+  case DT_FLOAT_INT: {
+    if(offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+    
+    float data; int data2;
+    fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
+    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
+    else fprintf(out_fh, "\t%f", data);
+    fprintf(out_fh, "\t%d", data2);
+    break;
+  }
+  case DT_FLOAT_FLOAT: {
+    if(offset != tbk->offset) {
+      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
+        wzfatal("File %s cannot be seeked.\n", tbk->fname);
+      tbk->offset = offset;
+    }
+    
+    float data,  data2;
+    fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
+    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
+    else fprintf(out_fh, "\t%f", data);
+    fprintf(out_fh, "\t%f", data2);
     break;
   }
   default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(tbk->dtype));

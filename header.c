@@ -55,14 +55,16 @@ int main_header(int argc, char *argv[]) {
       fprintf(stdout, "\nTBK File: %s\n", tbk.fname);
       fprintf(stdout, "TBK Version: %d\n", tbk.version);
       switch(DATA_TYPE(tbk.dtype)) {
-      case DT_INT1:   fputs("Data type: INT1\n", stdout);    break;
-      case DT_INT2:   fputs("Data type: INT2\n", stdout);    break;
-      case DT_INT32:  fputs("Data type: INT32\n", stdout);   break;
-      case DT_FLOAT:  fputs("Data type: FLOAT\n", stdout);   break;
-      case DT_DOUBLE: fputs("Data type: DOUBLE\n", stdout);  break;
-      case DT_ONES:   fputs("Data type: ONES\n", stdout);    break;
-      case DT_STRINGF:fprintf(stdout, "Data type: STRINGF (n=%"PRIu64")\n", STRING_MAX(tbk.dtype)); break;
-      case DT_STRINGD:fputs("Data type: STRINGD\n", stdout); break;
+      case DT_INT1:        fputs("Data type: INT1\n", stdout);        break;
+      case DT_INT2:        fputs("Data type: INT2\n", stdout);        break;
+      case DT_INT32:       fputs("Data type: INT32\n", stdout);       break;
+      case DT_FLOAT:       fputs("Data type: FLOAT\n", stdout);       break;
+      case DT_DOUBLE:      fputs("Data type: DOUBLE\n", stdout);      break;
+      case DT_STRINGF:     fprintf(stdout, "Data type: STRINGF (n=%"PRIu64")\n", STRING_MAX(tbk.dtype)); break;
+      case DT_STRINGD:     fputs("Data type: STRINGD\n", stdout);     break;
+      case DT_ONES:        fputs("Data type: ONES\n", stdout);        break;
+      case DT_FLOAT_INT:   fputs("Data type: FLOAT.INT\n", stdout);   break;
+      case DT_FLOAT_FLOAT: fputs("Data type: FLOAT.FLOAT\n", stdout); break;
       default: wzfatal("Data type %"PRIu64" unrecognized.\n", tbk.dtype);
       }
       fprintf(stdout, "Number of data: %"PRId64"\n", tbk.offset_max);

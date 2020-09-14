@@ -26,6 +26,16 @@ test_float:
 	../tbmate view -ko small/view_float2.out small/float.tbk
 	paste small/view_float2.out small/float.bed | awk -f wanding.awk -e 'abs($$4-$$8)>0.001'
 
+test_float_float:
+	../tbmate pack -s float.float small/float_float.bed small/float_float.tbk
+	../tbmate header small/float_float.tbk
+	../tbmate view -o small/view_float_float.out small/float_float.tbk
+	paste small/view_float_float.out small/float_float.bed | awk -f wanding.awk -e 'abs($$4-$$9)>0.001'
+	paste small/view_float_float.out small/float_float.bed | awk -f wanding.awk -e 'abs($$5-$$10)>0.001'
+	../tbmate view -ko small/view_float_float2.out small/float_float.tbk
+	paste small/view_float_float2.out small/float_float.bed | awk -f wanding.awk -e 'abs($$4-$$9)>0.001'
+	paste small/view_float_float2.out small/float_float.bed | awk -f wanding.awk -e 'abs($$5-$$10)>0.001'
+
 test_double:
 	../tbmate pack -s double small/double.bed small/double.tbk
 	../tbmate header small/double.tbk
