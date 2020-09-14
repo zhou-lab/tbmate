@@ -49,15 +49,17 @@
 #define HDR_MAX_OFFSET0 (3+4+8) /* offset to max offset */
 #define MAX_DOUBLE16 ((1<<15)-2)
 
-#define DT_INT1    1
-#define DT_INT2    2
-#define DT_INT32   3
-#define DT_FLOAT   4
-#define DT_DOUBLE  5
-#define DT_STRINGD 6
-#define DT_STRINGF 7
-#define DT_ONES    30
-#define DT_NA      99
+#define DT_INT1          1
+#define DT_INT2          2
+#define DT_INT32         3
+#define DT_FLOAT         4
+#define DT_DOUBLE        5
+#define DT_STRINGD       6
+#define DT_STRINGF       7
+#define DT_ONES          30
+#define DT_FLOAT_INT     31
+#define DT_FLOAT_FLOAT   32
+#define DT_NA            99
 
 #define DATA_TYPE(d) ((d)&0xff)
 #define STRING_MAX(d) ((d)>>8)
@@ -78,10 +80,10 @@ typedef struct tbk_t {
   char *fname;
   FILE *fh;
   int32_t version;
-  int64_t offset;   /* offset in the number of units or byte if unit is sub-byte */
-  int64_t offset_max;          /* offset < offset_max */
+  int64_t offset; /* offset in the number of units or byte if unit is sub-byte */
+  int64_t offset_max;           /* offset < offset_max */
   char extra[HDR_EXTRA];
-  uint64_t dtype;            /* data type */
+  uint64_t dtype;               /* data type */
   uint8_t data;                 /* sub-byte data */
 } tbk_t;
 
@@ -122,7 +124,13 @@ typedef struct conf_pack_t {
   float nan;
 } conf_pack_t;
 
-void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE*tmp_out, uint64_t *tmp_out_offset, conf_pack_t *conf);
+typedef struct beddata_t {
+  char *s[5];              /* to allow maximum 5 columns */
+  int n;
+} beddata_t;
+
+void tbk_write(beddata_t *bd, uint64_t dtype, FILE *out, int n, uint8_t *aux,
+               FILE*tmp_out, uint64_t *tmp_out_offset, conf_pack_t *conf);
 
 static inline void tbk_close(tbk_t *tbk) {
   fclose(tbk->fh);

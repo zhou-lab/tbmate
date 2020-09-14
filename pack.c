@@ -30,9 +30,27 @@
 #include "tbmate.h"
 #include "wzbed.h"
 
+void init_data(bed1_t *b, void *aux_data) {
+  b->data = calloc(sizeof(beddata_t), 1);
+  ((beddata_t*)b->data)->n = (uintptr_t) aux_data;
+}
+
+void free_data(void *bd0) {
+  int i;
+  beddata_t *bd = (beddata_t*) bd0;
+  for (i=0; i<bd->n; ++i) {
+    free(bd->s[i]);
+    bd->s[i] = 0;
+  }
+}
+
 void parse_data(bed1_t *b, char **fields, int nfields) {
   if (nfields < 4) wzfatal("No data in column 4.\n");
-  b->data = strdup(fields[3]);
+  int i; beddata_t *bd = (beddata_t*) b->data;
+  for (i=0; i<bd->n; ++i) {
+    bd->s[i] = strdup(fields[3+i]);
+  }
+  /* b->data = strdup(fields[3]); */
 }
 
 static int usage(conf_pack_t *conf) {
@@ -52,40 +70,43 @@ static int usage(conf_pack_t *conf) {
   return 1;
 }
 
-int is_integer(char **samples, int n_samples) {
+static int is_integer(beddata_t *samples, int n_samples) {
   int i, j;
   for (j=0;j<n_samples;++j) {
-    for (i=0;samples[j][i];++i) {
-      if (!isdigit(samples[j][i]) && samples[j][i] != '-') return 0;
+    for (i=0;samples[j].s[0][i];++i) {
+      if (!isdigit(samples[j].s[0][i]) &&
+          samples[j].s[0][i] != '-') return 0;
     }
   }
   return 1;
 }
 
-int is_float(char **samples, int n_samples) {
+/* only check the first unit */
+static int is_float(beddata_t *samples, int n_samples) {
   int i, j;
   for (j=0; j<n_samples; ++j) {
-    for (i=0;samples[j][i];++i) {
-      if (!isdigit(samples[j][i]) &&
-          samples[j][i] != '.' &&
-          samples[j][i] != '-') return 0;
+    for (i=0;samples[j].s[0][i];++i) {
+      if (!isdigit(samples[j].s[0][i]) &&
+          samples[j].s[0][i] != '.' &&
+          samples[j].s[0][i] != '-') return 0;
     }
   }
   return 1;
 }
 
-int data_type(char **samples, int n_samples) {
+static int data_type(beddata_t *samples, int n_samples) {
   if (is_float(samples, n_samples)) return DT_DOUBLE;
   if (is_integer(samples, n_samples)) return DT_INT32;
   return -1;
 }
 
-void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tmp_out, uint64_t *tmp_out_offset, conf_pack_t *conf) {
+void tbk_write(beddata_t *bd, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tmp_out, uint64_t *tmp_out_offset, conf_pack_t *conf) {
 
+  char *s = bd->s[0];
   switch(DATA_TYPE(dtype)) {
   case DT_INT1: {
     uint8_t d = 0;
-    switch(*s) {
+    switch(s[0]) {
     case '0': d=0; break;
     case '1': d=1; break;
     default: wzfatal("Error, non-binary data found: %s\n", s); }
@@ -114,17 +135,10 @@ void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tm
     break;
   }
   case DT_DOUBLE: {
-    float d = atof(s);
+    double d = atof(s);
     if (s[0] == '.' && s[1] == '\0') d = conf->nan;
     else d = atof(s);
     fwrite(&d, sizeof(double), 1, out);
-    break;
-  }
-  case DT_ONES: {
-    uint16_t d;
-    if (s[0] == '.' && s[1] == '\0') d = conf->nan;
-    else d = float_to_uint16(atof(s));
-    fwrite(&d, sizeof(uint16_t), 1, out);
     break;
   }
   case DT_STRINGF: {
@@ -140,6 +154,31 @@ void tbk_write(char *s, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tm
     fwrite(s, 1, n, tmp_out);
     fwrite(tmp_out_offset, 8, 1, out);
     *tmp_out_offset += strlen(s) + 1;
+    break;
+  }
+  case DT_ONES: {
+    uint16_t d;
+    if (s[0] == '.' && s[1] == '\0') d = conf->nan;
+    else d = float_to_uint16(atof(s));
+    fwrite(&d, sizeof(uint16_t), 1, out);
+    break;
+  }
+  case DT_FLOAT_INT: {
+    float d; int d2;
+    if (s[0] == '.' && s[1] == '\0') d = conf->nan; else d = atof(s);
+    s = bd->s[1];
+    if (s[0] == '.' && s[1] == '\0') d = conf->nan; else d2 = atoi(s);
+    fwrite(&d, sizeof(float), 1, out);
+    fwrite(&d2, sizeof(int32_t), 1, out);
+    break;
+  }
+  case DT_FLOAT_FLOAT: {
+    float d, d2;
+    if (s[0] == '.' && s[1] == '\0') d = conf->nan; else d = atof(s);
+    s = bd->s[1];
+    if (s[0] == '.' && s[1] == '\0') d = conf->nan; else d2 = atof(s);
+    fwrite(&d, sizeof(float), 1, out);
+    fwrite(&d2, sizeof(float), 1, out);
     break;
   }
   case DT_NA: wzfatal("Fail to detect data type. Please specify -s explicity.\n"); break;
@@ -161,16 +200,18 @@ int main_pack(int argc, char *argv[]) {
   while ((c = getopt(argc, argv, "s:x:m:n:h"))>=0) {
     switch (c) {
     case 's':
-      if (strcmp(optarg, "int1") == 0)         dtype = DT_INT1;
-      else if (strcmp(optarg, "int2") == 0)    dtype = DT_INT2;
-      else if (strcmp(optarg, "int32") == 0)   dtype = DT_INT32;
-      else if (strcmp(optarg, "int") == 0)     dtype = DT_INT32;
-      else if (strcmp(optarg, "float") == 0)   dtype = DT_FLOAT;
-      else if (strcmp(optarg, "double") == 0)  dtype = DT_DOUBLE;
-      else if (strcmp(optarg, "ones") == 0)    dtype = DT_ONES;
-      else if (strcmp(optarg, "string") == 0)  dtype = DT_STRINGD;
-      else if (strcmp(optarg, "stringd") == 0) dtype = DT_STRINGD; /* fixed size string */
-      else if (strcmp(optarg, "stringf") == 0) dtype = DT_STRINGF;
+      if (strcmp(optarg, "int1") == 0)             dtype = DT_INT1;
+      else if (strcmp(optarg, "int2") == 0)        dtype = DT_INT2;
+      else if (strcmp(optarg, "int32") == 0)       dtype = DT_INT32;
+      else if (strcmp(optarg, "int") == 0)         dtype = DT_INT32;
+      else if (strcmp(optarg, "float") == 0)       dtype = DT_FLOAT;
+      else if (strcmp(optarg, "double") == 0)      dtype = DT_DOUBLE;
+      else if (strcmp(optarg, "string") == 0)      dtype = DT_STRINGD;
+      else if (strcmp(optarg, "stringd") == 0)     dtype = DT_STRINGD; /* fixed size string */
+      else if (strcmp(optarg, "stringf") == 0)     dtype = DT_STRINGF;
+      else if (strcmp(optarg, "ones") == 0)        dtype = DT_ONES;
+      else if (strcmp(optarg, "float.int") == 0)   dtype = DT_FLOAT_INT;
+      else if (strcmp(optarg, "float.float") == 0) dtype = DT_FLOAT_FLOAT;
       else wzfatal("Unrecognized data type: %s.\n", optarg);
       break;
     case 'x': idx_path = strdup(optarg); break;
@@ -208,11 +249,13 @@ int main_pack(int argc, char *argv[]) {
     strcat(tmp_fname, "_tmp_");
     tmp_out = fopen(tmp_fname, "wb");
   }
-    
-  bed1_t *b = init_bed1(NULL, NULL);
-  /* b->tid = -1; */
 
-  char *bd;
+  bed1_t *b;
+  if (dtype == DT_FLOAT_FLOAT || dtype == DT_FLOAT_INT) {
+    b = init_bed1(init_data, (void*) 2);
+  } else {
+    b = init_bed1(init_data, (void*) 1);
+  }
 
   FILE *idx = NULL;
   if (idx_path) {
@@ -226,7 +269,7 @@ int main_pack(int argc, char *argv[]) {
   }
 
   int64_t n = 0;
-  char *samples[1000] = {0};
+  beddata_t samples[1000] = {0};
   int64_t i;
   uint8_t aux;                  /* sub-byte encoding */
   while (bed_read1(bed, b, parse_data)) {
@@ -235,9 +278,8 @@ int main_pack(int argc, char *argv[]) {
       fprintf(idx, "%s\t%"PRId64"\t%"PRId64"\t%"PRId64"\n", b->seqname, b->beg, b->end, n);
     }
     
-    bd = (char*) b->data;
     if (n < 1000) {
-      samples[n++] = bd;
+      samples[n++] = *((beddata_t*) b->data);
       continue;
     }
 
@@ -245,12 +287,12 @@ int main_pack(int argc, char *argv[]) {
       if (dtype == DT_NA) dtype = data_type(samples, n);
       if (tbk_out) tbk_write_hdr(1, dtype, n, msg, tbk_out);
       for(i=0; i<n; ++i) {
-        if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset, &conf);
-        free(samples[i]);
+        if (tbk_out) tbk_write(&samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset, &conf);
+        free_data(&samples[i]);
       }
     }
-    if (tbk_out) tbk_write(bd, dtype, tbk_out, n, &aux, tmp_out, &tmp_out_offset, &conf);
-    free(bd);
+    if (tbk_out) tbk_write(b->data, dtype, tbk_out, n, &aux, tmp_out, &tmp_out_offset, &conf);
+    free_data(b->data);
     n++;
   }
 
@@ -259,14 +301,14 @@ int main_pack(int argc, char *argv[]) {
     if (dtype == DT_NA) dtype = data_type(samples, n);
     if (tbk_out) tbk_write_hdr(1, dtype, n, msg, tbk_out);
     for(i=0; i<n; ++i) {
-      if (tbk_out) tbk_write(samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset, &conf);
-      free(samples[i]);
+      if (tbk_out) tbk_write(&samples[i], dtype, tbk_out, i, &aux, tmp_out, &tmp_out_offset, &conf);
+      free_data(&samples[i]);
     }
   }
 
   if (dtype == DT_INT2) { if (tbk_out) fwrite(&aux, 1, 1, tbk_out); aux=0; }
   
-  free_bed1(b, NULL);
+  free_bed1(b, free_data);
   free_bed_file(bed);
   if (idx) {
     fclose(idx);
