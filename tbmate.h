@@ -142,12 +142,15 @@ static inline void tbk_close(tbk_t *tbk) {
 typedef struct view_conf_t {
   int precision;
   int column_name;
-  int print_all;
+  int print_all;             /* print additional column from index  */
+  int print_all_units;       /* print 2nd slot for float.float and float.int */
   int dot_for_negative;
   int show_unaddressed;
   int chunk_read;
   int n_chunk_index;
   int n_chunk_data;
+  float max_pval;               /* maximum pval for float.float */
+  int min_coverage;             /* minimum coverage for float.int */
 } view_conf_t;
 
 typedef struct tbk_data_t {

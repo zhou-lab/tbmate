@@ -236,9 +236,17 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     
     float data; int data2;
     fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
-    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
-    else fprintf(out_fh, "\t%f", data);
-    fprintf(out_fh, "\t%d", data2);
+
+    if (conf->dot_for_negative && data < 0) {
+      fputs("\t.", out_fh);
+    } else {
+      if (conf->min_coverage >= 0 && data2 < conf->min_coverage) {
+        fputs("\t.", out_fh);
+      } else {
+        fprintf(out_fh, "\t%f", data);
+      }
+    }
+    if (conf->print_all_units) fprintf(out_fh, "\t%d", data2);
     break;
   }
   case DT_FLOAT_FLOAT: {
@@ -250,9 +258,17 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     
     float data,  data2;
     fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
-    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
-    else fprintf(out_fh, "\t%f", data);
-    fprintf(out_fh, "\t%f", data2);
+
+    if (conf->dot_for_negative && data < 0) {
+      fputs("\t.", out_fh);
+    } else {
+      if (conf->max_pval >= 0 && data2 > conf->max_pval) {
+        fputs("\t.", out_fh);
+      } else {
+        fprintf(out_fh, "\t%f", data);
+      }
+    }
+    if (conf->print_all_units) fprintf(out_fh, "\t%f", data2);
     break;
   }
   default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(tbk->dtype));
@@ -352,11 +368,14 @@ static int usage(view_conf_t *conf) {
   fprintf(stderr, "              containing the first tbk file.\n");
   fprintf(stderr, "    -g        REGION\n");
   fprintf(stderr, "    -c        print column name\n");
-  fprintf(stderr, "    -a        print all column in the index\n");
+  fprintf(stderr, "    -a        print all column in the index.\n");
+  fprintf(stderr, "    -b        print additional column for float.float and float.int.\n");
   fprintf(stderr, "    -d        using dot for negative values\n");
   fprintf(stderr, "    -p        precision used to print float[%d]\n", conf->precision);
   fprintf(stderr, "    -u        show unaddressed (use -1)\n");
   fprintf(stderr, "    -R        file listing the regions\n");
+  fprintf(stderr, "    -s        min coverage for float.int (%d)\n", conf->min_coverage);
+  fprintf(stderr, "    -t        max p-value for float.float (%f)\n", conf->max_pval);
   fprintf(stderr, "    -k        read data in chunk\n");
   fprintf(stderr, "    -m        chunk size for index [%d], valid under -k.\n", conf->n_chunk_index);
   fprintf(stderr, "    -n        chunk size for data [%d], valid under -k.\n", conf->n_chunk_data);
@@ -371,12 +390,15 @@ int main_view(int argc, char *argv[]) {
   view_conf_t conf = {0};
   conf.precision = 3;
   conf.print_all = 0;
+  conf.print_all_units = 0;
   conf.column_name = 0;
   conf.dot_for_negative = 0;
   conf.show_unaddressed = 0;
   conf.chunk_read = 0;
   conf.n_chunk_index = 1000000;
   conf.n_chunk_data = 1000000;
+  conf.max_pval = -1.0;
+  conf.min_coverage = -1;
   
   int c;
   if (argc<2) return usage(&conf);
@@ -385,7 +407,7 @@ int main_view(int argc, char *argv[]) {
   char *region = NULL;
   FILE *out_fh = stdout;
   char *idx_fname = NULL;
-  while ((c = getopt(argc, argv, "i:o:R:m:n:p:g:ckaduh"))>=0) {
+  while ((c = getopt(argc, argv, "i:o:R:m:n:p:g:s:t:ckabduh"))>=0) {
     switch (c) {
     case 'i': idx_fname = strdup(optarg); break;
     case 'o': out_fh = fopen(optarg, "w"); break;
@@ -393,10 +415,13 @@ int main_view(int argc, char *argv[]) {
     case 'm': conf.n_chunk_index = atoi(optarg); break;
     case 'n': conf.n_chunk_data = atoi(optarg); break;
     case 'g': region = strdup(optarg); break;
+    case 's': conf.min_coverage = atoi(optarg); break;
+    case 't': conf.max_pval = atof(optarg); break;
     case 'p': conf.precision = atoi(optarg); break;
     case 'c': conf.column_name = 1; break;
     case 'k': conf.chunk_read = 1; break;
     case 'a': conf.print_all = 1; break;
+    case 'b': conf.print_all_units = 1; break;
     case 'd': conf.dot_for_negative = 1; break;
     case 'u': conf.show_unaddressed = 1; break;
     case 'h': return usage(&conf); break;

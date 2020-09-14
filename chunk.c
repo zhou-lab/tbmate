@@ -93,17 +93,31 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
   case DT_FLOAT_INT: {
     float data = ((float*) (d->data))[i*2];
     int data2 = ((int32_t*) (d->data))[i*2+1];
-    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
-    else ksprintf(ks, "\t%f", data);
-    ksprintf(ks, "\t%d", data2);
+    if (conf->dot_for_negative && data < 0) {
+      kputs("\t.", ks);
+    } else {
+      if (conf->min_coverage >= 0 && data2 < conf->min_coverage) {
+        kputs("\t.", ks);
+      } else {
+        ksprintf(ks, "\t%f", data);
+      }
+    }
+    if (conf->print_all_units) ksprintf(ks, "\t%d", data2);
     break;
   }
   case DT_FLOAT_FLOAT: {
     float data = ((float*) (d->data))[i*2];
     float data2 = ((float*) (d->data))[i*2+1];
-    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
-    else ksprintf(ks, "\t%f", data);
-    ksprintf(ks, "\t%f", data2);
+    if (conf->dot_for_negative && data < 0) {
+      kputs("\t.", ks);
+    } else {
+      if (conf->max_pval >= 0 && data2 > conf->max_pval) {
+        kputs("\t.", ks);
+      } else {
+        ksprintf(ks, "\t%f", data);
+      }
+    }
+    if (conf->print_all_units) ksprintf(ks, "\t%f", data2);
     break;
   }
   default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(d->dtype));
