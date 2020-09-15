@@ -36,7 +36,7 @@
 #include <inttypes.h>
 
 
-#define PACKAGE_VERSION "1.5.20200908"
+#define PACKAGE_VERSION "1.6.20200915"
 
 /* tbk file header format: */
 #define HDR_ID         3        /* three letter "tbk" */

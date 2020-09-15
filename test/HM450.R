@@ -5,8 +5,26 @@ betas <- readRDS('HM450/betas_GEOLoadSeriesMatrix.rds')
 source('../scripts/tbmate.R')
 tbk_pack(betas, out_dir = 'HM450/tbk', idx_fname = 'indices/HM450.idx.gz')
 betas <- tbk_data('HM450/tbk' ,probes='cg00000236')
+betas <- tbk_data('HM450/tbk')
 betas <- tbk_data('HM450/tbk' ,probes='cg00102731')
+betas <- tbk_data('/home/zhouw3/repo/tbmate/test/small/float_float.tbk')
+source('../scripts/tbmate.R')
 
+betas <- tbk_data('/home/zhouw3/repo/tbmate/test/small/float_int.tbk')
+betas <- tbk_data('/home/zhouw3/repo/tbmate/test/small/float_int.tbk', all_units=TRUE)
+
+betas <- tbk_data('/home/zhouw3/repo/tbmate/test/small/float_float.tbk')
+betas <- tbk_data('/home/zhouw3/repo/tbmate/test/small/float_float.tbk', all_units=TRUE)
+
+betas <- tbk_data(c(
+    '/home/zhouw3/repo/tbmate/test/small/float_float.tbk',
+    '/home/zhouw3/repo/tbmate/test/small/float_int.tbk',
+    '/home/zhouw3/repo/tbmate/test/small/float.tbk') , all_units=TRUE)
+
+betas <- tbk_data(c(
+    '/home/zhouw3/repo/tbmate/test/small/float_float.tbk',
+    '/home/zhouw3/repo/tbmate/test/small/float_int.tbk',
+    '/home/zhouw3/repo/tbmate/test/small/float.tbk'))
 
 
 
@@ -29,4 +47,14 @@ b <- tbk_data('/home/zhouw3/repo/tbmate/test/WGBS/tbk/', chrm='chr19', beg=20000
 tbk_data('/home/zhouw3/repo/tbmate/test/WGBS/tbk/', idx_fname='~/references/hg38/annotation/cpg/hg38_to_EPIC_idx.gz', chrm='cg00004072')
 tbk_data('/home/zhouw3/repo/tbmate/test/WGBS/tbk/', idx_fname='~/references/hg38/annotation/cpg/hg38_to_EPIC_idx.gz', probes='cg00004072')
 
+library(sesame)
+in_dir <- '/mnt/isilon/zhou_lab/projects/20191212_GEO_datasets/GSE122126/'
+pfxs <- searchIDATprefixes('/mnt/isilon/zhou_lab/projects/20191212_GEO_datasets/GSE122126/IDATs/')
+source('/home/zhouw3/repo/tbmate/scripts/tbmate.R')
 
+tmp <- mclapply(seq_along(pfxs), function(i) {
+    sset <- readIDATpair(pfxs[i])
+    betas <- getBetas(dyeBiasCorrTypeINorm(noob(sset)))
+    pvals <- pval(sset)[names(betas)]
+    tbk_pack(betas, data2 = pvals, out_dir = '/mnt/isilon/zhou_lab/projects/20191212_GEO_datasets/GSE122126/tbk/', out_fname = str_split(names(pfxs)[i],'_')[[1]][1], idx_fname = '/mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/HM450/HM450.idx.gz', dtype='FLOAT_FLOAT')
+}, mc.cores=15)
