@@ -474,6 +474,7 @@ tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype
         if (length(msg) == 0) {
             msg = idx_fname
         }
+        if (nchar(msg) == 0) msg <- idx_fname
         tbk_hdr_write(out_file, d1, dtype = dtype, msg = msg, tbk_version = tbk_version)
         tbk_write_unit(out_file, d1, d2, dtype)
     })

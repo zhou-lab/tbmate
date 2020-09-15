@@ -57,6 +57,6 @@ tmp <- mclapply(seq_along(pfxs), function(i) {
     cat(pfxs[i],sset@platform,'\n')
     betas <- getBetas(dyeBiasCorrTypeINorm(noob(sset)))
     pvals <- pval(sset)[names(betas)]
-    tbk_pack(betas, data2 = pvals, out_dir = sprintf('%s/%s_tbk/',sset@platform), out_fname = str_split(names(pfxs)[i],'_')[[1]][1], idx_fname = sprintf('/mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/%s/%s.idx.gz', sset@platform), dtype='FLOAT_FLOAT')
-}, mc.cores=15)
+    tbk_pack(betas, data2 = pvals, out_dir = sprintf('%s/tbk_%s/', base_dir, sset@platform), out_fname = str_split(names(pfxs)[i],'_')[[1]][1], idx_fname = sprintf('/mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/%s/%s.idx.gz', sset@platform, sset@platform), dtype='FLOAT_FLOAT')
+} , mc.cores=15)
 
