@@ -313,8 +313,25 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
               fprintf(out_fh, "\tField_%d", ii+1);
           }
         
-          for(ii=0; ii<n_tbks; ++ii)
-            fprintf(out_fh, "\t%s", tbks[ii].fname);
+          char *tmp = NULL; char *bname = NULL;
+          char *tmp2;
+          int k;
+          for(ii=0; ii<n_tbks; ++ii) {
+            tmp = strdup(tbks[ii].fname);
+            bname = basename(tmp);
+            k = strlen(bname);
+            if (k>4 && bname[k-4]=='.' && bname[k-3]=='t' && bname[k-2]=='b' && bname[k-1]=='k')
+              bname[k-4] = '\0';
+            fprintf(out_fh, "\t%s", bname);
+            if (conf->print_all_units) {
+              tmp2 = malloc(strlen(bname) + 5);
+              strcpy(tmp2, bname);
+              strcat(tmp2, "_sig2");
+              fprintf(out_fh, "\t%s", tmp2);
+              free(tmp2);
+            }
+            free(tmp);
+          }
         
           fputc('\n', out_fh);
         }
@@ -368,6 +385,7 @@ static int usage(view_conf_t *conf) {
   fprintf(stderr, "              containing the first tbk file.\n");
   fprintf(stderr, "    -g        REGION\n");
   fprintf(stderr, "    -c        print column name\n");
+  fprintf(stderr, "    -F        show full path as column name, otherwise base name.\n");
   fprintf(stderr, "    -a        print all column in the index.\n");
   fprintf(stderr, "    -b        print additional column for float.float and float.int.\n");
   fprintf(stderr, "    -d        using dot for negative values\n");
@@ -399,6 +417,7 @@ int main_view(int argc, char *argv[]) {
   conf.n_chunk_data = 1000000;
   conf.max_pval = -1.0;
   conf.min_coverage = -1;
+  conf.full_path_as_colname = 0;
   
   int c;
   if (argc<2) return usage(&conf);
@@ -407,7 +426,7 @@ int main_view(int argc, char *argv[]) {
   char *region = NULL;
   FILE *out_fh = stdout;
   char *idx_fname = NULL;
-  while ((c = getopt(argc, argv, "i:o:R:m:n:p:g:s:t:ckabduh"))>=0) {
+  while ((c = getopt(argc, argv, "i:o:R:m:n:p:g:s:t:ckabduFh"))>=0) {
     switch (c) {
     case 'i': idx_fname = strdup(optarg); break;
     case 'o': out_fh = fopen(optarg, "w"); break;
@@ -424,6 +443,7 @@ int main_view(int argc, char *argv[]) {
     case 'b': conf.print_all_units = 1; break;
     case 'd': conf.dot_for_negative = 1; break;
     case 'u': conf.show_unaddressed = 1; break;
+    case 'F': conf.full_path_as_colname = 1; break;
     case 'h': return usage(&conf); break;
     default: usage(&conf); wzfatal("Unrecognized option: %c.\n", c);
     }

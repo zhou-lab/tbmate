@@ -48,13 +48,15 @@ tbk_data('/home/zhouw3/repo/tbmate/test/WGBS/tbk/', idx_fname='~/references/hg38
 tbk_data('/home/zhouw3/repo/tbmate/test/WGBS/tbk/', idx_fname='~/references/hg38/annotation/cpg/hg38_to_EPIC_idx.gz', probes='cg00004072')
 
 library(sesame)
-in_dir <- '/mnt/isilon/zhou_lab/projects/20191212_GEO_datasets/GSE122126/'
-pfxs <- searchIDATprefixes('/mnt/isilon/zhou_lab/projects/20191212_GEO_datasets/GSE122126/IDATs/')
-source('/home/zhouw3/repo/tbmate/scripts/tbmate.R')
+base_dir <- '/mnt/isilon/zhou_lab/projects/20191212_GEO_datasets/GSE122126/'
+pfxs <- searchIDATprefixes(file.path(base_dir, 'IDATs'))
+source('https://raw.githubusercontent.com/zhou-lab/tbmate/master/scripts/tbmate.R')
 
 tmp <- mclapply(seq_along(pfxs), function(i) {
     sset <- readIDATpair(pfxs[i])
+    cat(pfxs[i],sset@platform,'\n')
     betas <- getBetas(dyeBiasCorrTypeINorm(noob(sset)))
     pvals <- pval(sset)[names(betas)]
-    tbk_pack(betas, data2 = pvals, out_dir = '/mnt/isilon/zhou_lab/projects/20191212_GEO_datasets/GSE122126/tbk/', out_fname = str_split(names(pfxs)[i],'_')[[1]][1], idx_fname = '/mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/HM450/HM450.idx.gz', dtype='FLOAT_FLOAT')
+    tbk_pack(betas, data2 = pvals, out_dir = sprintf('%s/%s_tbk/',sset@platform), out_fname = str_split(names(pfxs)[i],'_')[[1]][1], idx_fname = sprintf('/mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/%s/%s.idx.gz', sset@platform), dtype='FLOAT_FLOAT')
 }, mc.cores=15)
+

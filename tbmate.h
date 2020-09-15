@@ -151,6 +151,7 @@ typedef struct view_conf_t {
   int n_chunk_data;
   float max_pval;               /* maximum pval for float.float */
   int min_coverage;             /* minimum coverage for float.int */
+  int full_path_as_colname;
 } view_conf_t;
 
 typedef struct tbk_data_t {
