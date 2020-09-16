@@ -141,8 +141,9 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     
     int data;
     fread(&data, 4, 1, tbk->fh); tbk->offset++;
-    if (conf->na_for_negative && data < 0) { fputc('\t', out_fh); fputs(conf->na_token, out_fh); }
-    else fprintf(out_fh, "\t%d", data);
+    if (conf->na_for_negative && data < 0) {
+      fputc('\t', out_fh); fputs(conf->na_token, out_fh);
+    } else fprintf(out_fh, "\t%d", data);
     break;
   }
   case DT_FLOAT: {
@@ -154,8 +155,9 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     
     float data;
     fread(&data, 4, 1, tbk->fh); tbk->offset++;
-    if (conf->na_for_negative && data < 0) { fputc('\t', out_fh); fputs(conf->na_token, out_fh); }
-    else fprintf(out_fh, "\t%f", data);
+    if (conf->na_for_negative && data < 0) {
+      fputc('\t', out_fh); fputs(conf->na_token, out_fh);
+    } else fprintf(out_fh, "\t%f", data);
     break;
   }
   case DT_DOUBLE: {
@@ -167,8 +169,9 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     
     double data;
     fread(&data, 8, 1, tbk->fh); tbk->offset++;
-    if (conf->na_for_negative && data < 0) { fputc('\t', out_fh); fputs(conf->na_token, out_fh); }
-    else fprintf(out_fh, "\t%f", data);
+    if (conf->na_for_negative && data < 0) {
+      fputc('\t', out_fh); fputs(conf->na_token, out_fh);
+    } else fprintf(out_fh, "\t%f", data);
     break;
   }
   case DT_STRINGF: {
@@ -222,8 +225,9 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     uint16_t data;
     fread(&data, 2, 1, tbk->fh); tbk->offset++;
     float dataf = uint16_to_float(data);
-    if (conf->na_for_negative && dataf < 0) fputs("\t.", out_fh);
-    else fprintf(out_fh, "\t%.*f", conf->precision, dataf);
+    if (conf->na_for_negative && dataf < 0) {
+      fputc('\t', out_fh); fputs(conf->na_token, out_fh);
+    } else fprintf(out_fh, "\t%.*f", conf->precision, dataf);
     /* fprintf(out_fh, "\t%d", data); */
     break;
   }
@@ -238,10 +242,10 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
 
     if (conf->na_for_negative && data < 0) {
-      fputs("\t.", out_fh);
+      fputc('\t', out_fh); fputs(conf->na_token, out_fh);
     } else {
       if (conf->min_coverage >= 0 && data2 < conf->min_coverage) {
-        fputs("\t.", out_fh);
+        fputc('\t', out_fh); fputs(conf->na_token, out_fh);
       } else {
         fprintf(out_fh, "\t%f", data);
       }
@@ -260,10 +264,10 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
 
     if (conf->na_for_negative && data < 0) {
-      fputs("\t.", out_fh);
+      fputc('\t', out_fh); fputs(conf->na_token, out_fh);
     } else {
       if (conf->max_pval >= 0 && data2 > conf->max_pval) {
-        fputs("\t.", out_fh);
+        fputc('\t', out_fh); fputs(conf->na_token, out_fh);
       } else {
         fprintf(out_fh, "\t%f", data);
       }

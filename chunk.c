@@ -94,10 +94,10 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
     float data = ((float*) (d->data))[i*2];
     int data2 = ((int32_t*) (d->data))[i*2+1];
     if (conf->na_for_negative && data < 0) {
-      { kputc('\t', ks); kputs(conf->na_token, ks); }
+      kputc('\t', ks); kputs(conf->na_token, ks);
     } else {
       if (conf->min_coverage >= 0 && data2 < conf->min_coverage) {
-        { kputc('\t', ks); kputs(conf->na_token, ks); }
+        kputc('\t', ks); kputs(conf->na_token, ks);
       } else {
         ksprintf(ks, "\t%f", data);
       }
@@ -109,10 +109,10 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
     float data = ((float*) (d->data))[i*2];
     float data2 = ((float*) (d->data))[i*2+1];
     if (conf->na_for_negative && data < 0) {
-      { kputc('\t', ks); kputs(conf->na_token, ks); }
+      kputc('\t', ks); kputs(conf->na_token, ks);
     } else {
       if (conf->max_pval >= 0 && data2 > conf->max_pval) {
-        { kputc('\t', ks); kputs(conf->na_token, ks); }
+        kputc('\t', ks); kputs(conf->na_token, ks);
       } else {
         ksprintf(ks, "\t%f", data);
       }
