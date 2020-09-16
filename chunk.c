@@ -57,19 +57,19 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
   }
   case DT_INT32: {
     int data = ((int32_t*) (d->data))[i];
-    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
+    if (conf->na_for_negative && data < 0) { kputc('\t', ks); kputs(conf->na_token, ks); }
     else ksprintf(ks, "\t%d", data);
     break;
   }
   case DT_FLOAT: {
     float data = ((float*) (d->data))[i];
-    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
+    if (conf->na_for_negative && data < 0) { kputc('\t', ks); kputs(conf->na_token, ks); }
     else ksprintf(ks, "\t%f", data);
     break;
   }
   case DT_DOUBLE: {
     double data = ((double*) (d->data))[i];
-    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
+    if (conf->na_for_negative && data < 0) { kputc('\t', ks); kputs(conf->na_token, ks); }
     else ksprintf(ks, "\t%f", data);
     break;
   }
@@ -86,18 +86,18 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
   }
   case DT_ONES: {
     float data = ((float*) (d->data))[i];
-    if (conf->dot_for_negative && data < 0) kputs("\t.", ks);
+    if (conf->na_for_negative && data < 0) { kputc('\t', ks); kputs(conf->na_token, ks); }
     else ksprintf(ks, "\t%.*f", conf->precision, data);
     break;
   }
   case DT_FLOAT_INT: {
     float data = ((float*) (d->data))[i*2];
     int data2 = ((int32_t*) (d->data))[i*2+1];
-    if (conf->dot_for_negative && data < 0) {
-      kputs("\t.", ks);
+    if (conf->na_for_negative && data < 0) {
+      { kputc('\t', ks); kputs(conf->na_token, ks); }
     } else {
       if (conf->min_coverage >= 0 && data2 < conf->min_coverage) {
-        kputs("\t.", ks);
+        { kputc('\t', ks); kputs(conf->na_token, ks); }
       } else {
         ksprintf(ks, "\t%f", data);
       }
@@ -108,11 +108,11 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
   case DT_FLOAT_FLOAT: {
     float data = ((float*) (d->data))[i*2];
     float data2 = ((float*) (d->data))[i*2+1];
-    if (conf->dot_for_negative && data < 0) {
-      kputs("\t.", ks);
+    if (conf->na_for_negative && data < 0) {
+      { kputc('\t', ks); kputs(conf->na_token, ks); }
     } else {
       if (conf->max_pval >= 0 && data2 > conf->max_pval) {
-        kputs("\t.", ks);
+        { kputc('\t', ks); kputs(conf->na_token, ks); }
       } else {
         ksprintf(ks, "\t%f", data);
       }
@@ -357,17 +357,7 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
         wzfatal("[%s:%d] Bed file has fewer than 3 columns.\n", __func__, __LINE__);
 
       if (!linenum && conf->column_name) { /* header */
-        fputs("seqname\tstart\tend", out_fh);
-        if (conf->print_all) {
-          fputs("\toffset", out_fh);
-          for(ii=4; ii<nfields; ++ii)
-            fprintf(out_fh, "\tField_%d", ii+1);
-        }
-        
-        for(ii=0; ii<n_tbks; ++ii)
-          fprintf(out_fh, "\t%s", tbks[ii].fname);
-        
-        fputc('\n', out_fh);
+        tbk_print_columnnames(tbks, n_tbks, nfields, out_fh, conf);
       }
       
       ensure_number2(fields[3]);

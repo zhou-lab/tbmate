@@ -141,7 +141,7 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     
     int data;
     fread(&data, 4, 1, tbk->fh); tbk->offset++;
-    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
+    if (conf->na_for_negative && data < 0) { fputc('\t', out_fh); fputs(conf->na_token, out_fh); }
     else fprintf(out_fh, "\t%d", data);
     break;
   }
@@ -154,7 +154,7 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     
     float data;
     fread(&data, 4, 1, tbk->fh); tbk->offset++;
-    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
+    if (conf->na_for_negative && data < 0) { fputc('\t', out_fh); fputs(conf->na_token, out_fh); }
     else fprintf(out_fh, "\t%f", data);
     break;
   }
@@ -167,7 +167,7 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     
     double data;
     fread(&data, 8, 1, tbk->fh); tbk->offset++;
-    if (conf->dot_for_negative && data < 0) fputs("\t.", out_fh);
+    if (conf->na_for_negative && data < 0) { fputc('\t', out_fh); fputs(conf->na_token, out_fh); }
     else fprintf(out_fh, "\t%f", data);
     break;
   }
@@ -222,7 +222,7 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     uint16_t data;
     fread(&data, 2, 1, tbk->fh); tbk->offset++;
     float dataf = uint16_to_float(data);
-    if (conf->dot_for_negative && dataf < 0) fputs("\t.", out_fh);
+    if (conf->na_for_negative && dataf < 0) fputs("\t.", out_fh);
     else fprintf(out_fh, "\t%.*f", conf->precision, dataf);
     /* fprintf(out_fh, "\t%d", data); */
     break;
@@ -237,7 +237,7 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     float data; int data2;
     fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
 
-    if (conf->dot_for_negative && data < 0) {
+    if (conf->na_for_negative && data < 0) {
       fputs("\t.", out_fh);
     } else {
       if (conf->min_coverage >= 0 && data2 < conf->min_coverage) {
@@ -259,7 +259,7 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     float data,  data2;
     fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
 
-    if (conf->dot_for_negative && data < 0) {
+    if (conf->na_for_negative && data < 0) {
       fputs("\t.", out_fh);
     } else {
       if (conf->max_pval >= 0 && data2 > conf->max_pval) {
@@ -304,37 +304,8 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
       if (nfields < 3)
         wzfatal("[%s:%d] Bed file has fewer than 3 columns.\n", __func__, __LINE__);
 
-      if (!linenum) {
-        if (conf->column_name) {
-          fputs("seqname\tstart\tend", out_fh);
-          if (conf->print_all) {
-            fputs("\toffset", out_fh);
-            for(ii=4; ii<nfields; ++ii)
-              fprintf(out_fh, "\tField_%d", ii+1);
-          }
-        
-          char *tmp = NULL; char *bname = NULL;
-          char *tmp2;
-          int k;
-          for(ii=0; ii<n_tbks; ++ii) {
-            tmp = strdup(tbks[ii].fname);
-            bname = basename(tmp);
-            k = strlen(bname);
-            if (k>4 && bname[k-4]=='.' && bname[k-3]=='t' && bname[k-2]=='b' && bname[k-1]=='k')
-              bname[k-4] = '\0';
-            fprintf(out_fh, "\t%s", bname);
-            if (conf->print_all_units) {
-              tmp2 = malloc(strlen(bname) + 5);
-              strcpy(tmp2, bname);
-              strcat(tmp2, "_sig2");
-              fprintf(out_fh, "\t%s", tmp2);
-              free(tmp2);
-            }
-            free(tmp);
-          }
-        
-          fputc('\n', out_fh);
-        }
+      if (!linenum && conf->column_name) {
+        tbk_print_columnnames(tbks, n_tbks, nfields, out_fh, conf);
       }
       linenum++;
       
@@ -383,12 +354,14 @@ static int usage(view_conf_t *conf) {
   fprintf(stderr, "    -i        index, a tabix-ed bed file. Column 4 is the .tbk offset.\n");
   fprintf(stderr, "              if not given search for idx.gz and idx.gz.tbi in the folder\n");
   fprintf(stderr, "              containing the first tbk file.\n");
+  fprintf(stderr, "    -l        provide tbk file names in the list.\n");
   fprintf(stderr, "    -g        REGION\n");
   fprintf(stderr, "    -c        print column name\n");
   fprintf(stderr, "    -F        show full path as column name, otherwise base name.\n");
   fprintf(stderr, "    -a        print all column in the index.\n");
   fprintf(stderr, "    -b        print additional column for float.float and float.int.\n");
-  fprintf(stderr, "    -d        using dot for negative values\n");
+  fprintf(stderr, "    -d        using NA for negative values\n");
+  fprintf(stderr, "    -N        NA token [%s]\n", conf->na_token);
   fprintf(stderr, "    -p        precision used to print float[%d]\n", conf->precision);
   fprintf(stderr, "    -u        show unaddressed (use -1)\n");
   fprintf(stderr, "    -R        file listing the regions\n");
@@ -403,6 +376,16 @@ static int usage(view_conf_t *conf) {
   return 1;
 }
 
+void tbk_set_sname_by_fname(tbk_t *tbk) {
+  char *tmp = strdup(tbk->fname);
+  char *bname = basename(tmp);
+  int k = strlen(bname);
+  if (k>4 && bname[k-4]=='.' && bname[k-3]=='t' && bname[k-2]=='b' && bname[k-1]=='k')
+    bname[k-4] = '\0';
+  tbk->sname = strdup(bname);
+  free(tmp);
+}
+
 int main_view(int argc, char *argv[]) {
 
   view_conf_t conf = {0};
@@ -410,7 +393,7 @@ int main_view(int argc, char *argv[]) {
   conf.print_all = 0;
   conf.print_all_units = 0;
   conf.column_name = 0;
-  conf.dot_for_negative = 0;
+  conf.na_for_negative = 0;
   conf.show_unaddressed = 0;
   conf.chunk_read = 0;
   conf.n_chunk_index = 1000000;
@@ -418,6 +401,7 @@ int main_view(int argc, char *argv[]) {
   conf.max_pval = -1.0;
   conf.min_coverage = -1;
   conf.full_path_as_colname = 0;
+  conf.na_token = strdup("NA");
   
   int c;
   if (argc<2) return usage(&conf);
@@ -426,11 +410,14 @@ int main_view(int argc, char *argv[]) {
   char *region = NULL;
   FILE *out_fh = stdout;
   char *idx_fname = NULL;
-  while ((c = getopt(argc, argv, "i:o:R:m:n:p:g:s:t:ckabduFh"))>=0) {
+  char *tbk_fname_list = NULL;
+  while ((c = getopt(argc, argv, "i:l:o:R:N:m:n:p:g:s:t:ckabduFh"))>=0) {
     switch (c) {
     case 'i': idx_fname = strdup(optarg); break;
+    case 'l': tbk_fname_list = strdup(optarg); break;
     case 'o': out_fh = fopen(optarg, "w"); break;
     case 'R': regions_fname = optarg; break;
+    case 'N': conf.na_token = strdup(optarg); break;
     case 'm': conf.n_chunk_index = atoi(optarg); break;
     case 'n': conf.n_chunk_data = atoi(optarg); break;
     case 'g': region = strdup(optarg); break;
@@ -441,7 +428,7 @@ int main_view(int argc, char *argv[]) {
     case 'k': conf.chunk_read = 1; break;
     case 'a': conf.print_all = 1; break;
     case 'b': conf.print_all_units = 1; break;
-    case 'd': conf.dot_for_negative = 1; break;
+    case 'd': conf.na_for_negative = 1; break;
     case 'u': conf.show_unaddressed = 1; break;
     case 'F': conf.full_path_as_colname = 1; break;
     case 'h': return usage(&conf); break;
@@ -449,7 +436,7 @@ int main_view(int argc, char *argv[]) {
     }
   }
 
-  if (optind > argc) { 
+  if (optind > argc && !tbk_fname_list) {
     usage(&conf); 
     wzfatal("Please supply tbk file.\n"); 
   }
@@ -472,14 +459,38 @@ int main_view(int argc, char *argv[]) {
           strcpy(tbks[n_tbks].fname, argv[optind]);
           strcat(tbks[n_tbks].fname, "/");
           strcat(tbks[n_tbks].fname, dir->d_name);
+          tbk_set_sname_by_fname(&tbks[n_tbks]);
           n_tbks++;
         }
       }
       closedir(d);
     } else {
       tbks = realloc(tbks, (n_tbks+1)*sizeof(tbk_t));
-      tbks[n_tbks++].fname = strdup(argv[optind]);
+      tbks[n_tbks].fname = strdup(argv[optind]);
+      tbk_set_sname_by_fname(&tbks[n_tbks]);
+      n_tbks++;
     }
+  }
+
+  if (tbk_fname_list) {
+    gzFile fh = wzopen(tbk_fname_list);
+    if (!fh) { wzfatal("Cannot read tbk file name list."); }
+    char *line = NULL; char **fields; int nfields;
+    while(gzFile_read_line(fh, &line)) {
+      line_get_fields(line, "\t", &fields, &nfields);
+      if (nfields > 0) {
+        tbks = realloc(tbks, (n_tbks+1)*sizeof(tbk_t));
+        tbks[n_tbks].fname = strdup(fields[0]);
+        if (nfields > 1) {
+          tbks[n_tbks].sname = strdup(fields[1]);
+        } else {
+          tbk_set_sname_by_fname(&tbks[n_tbks]);
+        }
+        n_tbks++;
+      }
+      free_fields(fields, nfields);
+    }
+    free(line);
   }
 
   /* look at the message box */
@@ -539,6 +550,7 @@ int main_view(int argc, char *argv[]) {
   if (n_tbks > 0) {for (i=0; i<n_tbks; ++i) free(tbks[i].fname);}
   free(tbks);
   if (idx_fname) free(idx_fname);
+  free(conf.na_token);
   return ret;
 }
 

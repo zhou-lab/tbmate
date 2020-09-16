@@ -78,6 +78,7 @@ static inline uint16_t float_to_uint16(float f) {
 
 typedef struct tbk_t {
   char *fname;
+  char *sname;
   FILE *fh;
   int32_t version;
   int64_t offset; /* offset in the number of units or byte if unit is sub-byte */
@@ -135,8 +136,10 @@ void tbk_write(beddata_t *bd, uint64_t dtype, FILE *out, int n, uint8_t *aux,
 static inline void tbk_close(tbk_t *tbk) {
   fclose(tbk->fh);
   char *fname = tbk->fname;
+  char *sname = tbk->sname;
   memset(tbk, 0, sizeof(tbk_t));
   tbk->fname = fname;
+  tbk->sname = sname;
 }
 
 typedef struct view_conf_t {
@@ -144,7 +147,8 @@ typedef struct view_conf_t {
   int column_name;
   int print_all;             /* print additional column from index  */
   int print_all_units;       /* print 2nd slot for float.float and float.int */
-  int dot_for_negative;
+  int na_for_negative;
+  char *na_token;
   int show_unaddressed;
   int chunk_read;
   int n_chunk_index;
@@ -161,5 +165,29 @@ typedef struct tbk_data_t {
 } tbk_data_t;
 
 int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_tbks, view_conf_t *conf, FILE *out_fh);
+
+static inline void tbk_print_columnnames(tbk_t *tbks, int n_tbks, int nfields, FILE *out_fh, view_conf_t *conf) {
+
+  int ii;
+  fputs("seqname\tstart\tend", out_fh);
+  if (conf->print_all) {
+    fputs("\toffset", out_fh);
+    for(ii=4; ii<nfields; ++ii)
+      fprintf(out_fh, "\tField_%d", ii+1);
+  }
+
+  for(ii=0; ii<n_tbks; ++ii) {
+    fprintf(out_fh, "\t%s", tbks[ii].sname);
+    if (conf->print_all_units) {
+      char *tmp = malloc(strlen(tbks[ii].sname) + 5);
+      strcpy(tmp, tbks[ii].sname);
+      strcat(tmp, "_sig2");
+      fprintf(out_fh, "\t%s", tmp);
+      free(tmp);
+    }
+  }
+
+  fputc('\n', out_fh);
+}
 
 #endif /* _TBMATE_H */
