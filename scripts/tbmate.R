@@ -252,8 +252,8 @@ infer_idx <- function(tbk_fname) {
             file.exists(file.path(dirname(tbk_fname), 'idx.gz.tbi'))) {
         idx_fname <- file.path(dirname(tbk_fname), 'idx.gz')
     } else {
-        hdr <- tbk_hdrs(tbk_fname)
-        if (file.exists(hdr$msg)) {
+        hdr <- tbk_hdrs(tbk_fname)[[1]]
+        if (!is.null(hdr$msg) && file.exists(hdr$msg)) {
             idx_fname <- hdr$msg
         }
         stop("Cannot locate index file. Provide through idx_fname.\n")
