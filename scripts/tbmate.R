@@ -407,8 +407,9 @@ tbk_write_unit <- function(out_file, d1, d2, dtype) {
 #' @param out_fname output tbk file name
 #' @param dtype data type, INT1, INT2, INT32, FLOAT, DOUBLE, STRINGD, STRINGF
 #' @param idx_fname index file name
+#' @param link_idx whether or not a link is generated to the index
 #' @export
-tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_fname = NULL, tbk_version = 1, msg="", na.token = -1.0) {
+tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_fname = NULL, tbk_version = 1, msg="", na.token = -1.0, link_idx = FALSE) {
 
     ## output dir
     if (is.null(out_dir)) {
@@ -428,7 +429,7 @@ tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype
         } else {
             stop("Please provide idx_fname.\n")
         }
-    } else if (!file.exists(file.path(out_dir, 'idx.gz'))) { # set up idx.gz if nonexistent
+    } else if (link_idx && !file.exists(file.path(out_dir, 'idx.gz'))) { # set up idx.gz if nonexistent
         file.symlink(
             tools::file_path_as_absolute(idx_fname),
             file.path(out_dir, 'idx.gz'))
