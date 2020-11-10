@@ -41,7 +41,7 @@ pip install git+https://github.com/zhou-lab/tbmate/pytbmate
 ```
 OR
 ```
-git clone https://github.com/DingWB/pytbmate
+git clone https://github.com/zhou-lab/tbmate/pytbmate
 cd pytbmate
 python setup.py install
 ```
