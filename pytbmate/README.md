@@ -37,7 +37,7 @@ mv tbmate /usr/bin
 3. **Install pytbmate**:
 ```
 pip install pytabix
-pip install git+https://github.com/DingWB/pytbmate
+pip install git+https://github.com/zhou-lab/tbmate/pytbmate
 ```
 OR
 ```
