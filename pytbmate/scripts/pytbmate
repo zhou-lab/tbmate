@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep  8 17:34:38 2020
+
+@author: DingWB
+"""
+import os,sys
+import argparse
+from tbmate import Pack,Header,View
+from tbmate.tbmate import __version__,dtype_fmt,dtype_map_rev
+# =============================================================================
+def prepare_optparser():
+    usage = "usage: pytbmate <command> [optional] args\n" #python %prog
+    description = "pytbmate"
+
+    epilog='example usage:\n pytbmate pack -o outbasename -i index.gz file1.gz; pytbmate query -r chr1:10468-10470 in.tbk'
+
+    parser = argparse.ArgumentParser(prog='pytbmate',usage=usage,\
+             description=description,epilog=epilog)
+    parser.add_argument('-v', '--version', action='version', version=__version__,help='Display version')
+
+    subparsers = parser.add_subparsers(title="commands",dest='command',
+                metavar='')
+
+    subparsers.add_parser('header',formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        parents=[SubcommandArgs(case='header')],
+        help="show header of a given .tbk file",
+        add_help=True,
+        usage='pytbmate header -i in.tbk\n')
+
+    subparsers.add_parser('pack',formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        parents=[SubcommandArgs(case='pack')],
+        help="Pack file into .tbk, file must be the same order as the index file.",
+        add_help=True,
+        usage='pytbmate pack -i infile.txt.gz -o out.tbk\n')
+
+    subparsers.add_parser('view',formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        parents=[SubcommandArgs(case='view')],
+        help="View a .tbk file",
+        add_help=True,
+        usage='pytbmate view -r chr1:10468-10470 -o out.tbk\n')
+    
+    parser.add_argument('infile',help="input file",metavar="<infile>") #type=argparse.FileType('r')
+
+    return parser
+# =============================================================================
+def SubcommandArgs(case='pack'):
+    parser = argparse.ArgumentParser(add_help=False)
+    required = parser.add_argument_group('Required arguments')
+
+    # define the arguments
+
+    if case=='pack':
+        required.add_argument('-i', '--index',dest='index',type=str,\
+                        help="index file (for tabix)",metavar="<index>",required=True)
+
+        required.add_argument('-o', '--outname',dest='outname',default='out',\
+                        type=str,help="output basename",\
+                        metavar="<outname>",required=True)
+
+    optional = parser.add_argument_group('Optional arguments')
+
+    if case == 'pack':
+        optional.add_argument('-c', '--cols',dest='cols',metavar='4',
+                              help='columns to be packed (1-based), separated by comma \
+                              if there are more than one columns to be packed.',
+                              default='4',type=str)
+        optional.add_argument('-d', '--dtypes',dest='dtypes',metavar='float',
+                              help='dtypes for columns (comma separated,the same length with -c)',
+                              default='float',type=str)
+
+#        optional.add_argument('-f', '--force',dest='force',\
+#                        action='store_true',\
+#                        help="if outname_*.tbk exists, whether to overwrite it.")
+    elif case == 'view':
+        optional.add_argument('-i', '--index',dest='index',type=str,\
+                        help="index file",metavar="<index>",required=False)
+        optional.add_argument('-r', '--region',dest='region',\
+                        type=str,help="region to query",\
+                        metavar="<region>",required=False)
+    return parser
+# =============================================================================
+#
+# =============================================================================
+def opt_validate(optparser):
+    args = optparser.parse_args()
+#    print(args)
+    args.infile=os.path.abspath(args.infile)
+    if args.command == 'pack':
+        args.cols=[int(i) for i in args.cols.split(',')]
+        args.dtypes=[str(i) for i in args.dtypes.split(',')]
+        if len(args.cols) != len(args.dtypes):
+            if len(args.dtypes) == 1:
+                args.dtypes = [args.dtypes[0] for i in range(len(args.cols))]
+            else:
+                sys.exit("The length of arg -cols must be the same with -dtype.")
+        args.outname=os.path.abspath(args.outname)
+        args.index=os.path.abspath(args.index)
+        for dtype in args.dtypes:
+            if dtype not in dtype_fmt:
+                sys.exit(f"Input dtype '{dtype}' can not be recognized.")
+
+    elif args.command == 'view' and args.region:#view
+        start=1
+        end=2
+        if ':' in args.region:
+            seqname=args.region.split(':')[0]
+            s=args.region.split(':')[1]
+            if '-' in s:
+                try:
+                    start=int(s.split('-')[0])
+                    end=int(s.split('-')[1])
+                except:
+                    sys.exit("Please input correct region.")
+
+        else:
+            seqname=args.region
+        args.region=[seqname,start,end]
+    return args
+# =============================================================================
+#
+if __name__=="__main__":
+    args=opt_validate(prepare_optparser())
+#    print(args)
+    if args.command == 'header':
+        ver,dtype,num,idx=Header(args.infile)
+        out_msg=f"tbk file: {args.infile} \ntbk version: {ver} \ndata type: {dtype_map_rev[dtype]} \nNumber of data: {num}\nidx file: {idx}"
+        print(out_msg)
+    elif args.command == 'pack':
+        Pack(args.infile,idx=args.index,basename=args.outname,\
+             cols_to_pack=args.cols,dtypes=args.dtypes)
+    else:#view
+        if args.region:
+            seqname,start,end=args.region
+            R=Query(tbk_file=args.infile,seqname=seqname,start=start,end=end,
+              idx=None,dtype=None,base_idx=8192)
+            print("seqname\tstart\tend\t%s"%os.path.basename(args.infile).replace('.tbk',''))
+            if type(R) != list:
+                print(f"{seqname}\t{start}\t{end}\t{R}")
+            else:
+                for r in R:
+                    print(f"{seqname}\t{start}\t{end}\t{r}")
+        else:#No region "-r" was given, then view all recores
+            View(tbk_file=args.infile,idx=args.index,dtype=None,base_idx=8192)
