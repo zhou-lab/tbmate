@@ -26,7 +26,7 @@ tbmate is currently implemented in C, Python and R. It can easily be extended to
 ## **Installation**
 1. **Install tabix**:
 
-You can download and install [tabix](http://www.htslib.org/doc/tabix.html). Or:
+You can download and install tabix from [here](http://www.htslib.org/doc/tabix.html). Or directly install it with:
 ```
 wget https://github.com/samtools/htslib/releases/download/1.11/htslib-1.11.tar.bz2
 tar jxvf htslib-1.11.tar.bz2
@@ -67,6 +67,7 @@ Python API is under [pytbmate](https://github.com/zhou-lab/tbmate/pytbmate)
 ## Usage
 
 **1. Building tabix index.**
+
 For example, downloading HM450 array manifest file and index it with tabix
 ```
 wget ftp://webdata2:webdata2@ussd-ftp.illumina.com/downloads/ProductFiles/HumanMethylation450/HumanMethylation450_15017482_v1-2.csv
@@ -165,7 +166,8 @@ Options:
 Note, in.bed is an index-ordered bed file. Column 4 will be made a .tbk file.
 ```
 
-For example:
+For example:</br>
+
 - Packing HM450 array data into .tbk.
 ```
 cd Test/HM450/
@@ -215,7 +217,7 @@ Options:
 cd Test/WGBS/
 tbmate header TCGA_BLCA_A13J.tbk
 
-# view the whold data
+# view the whole dataset
 tbmate view -c TCGA_BLCA_A13J.tbk |less
 
 # query by a given genomic region (chr:start-end)
@@ -234,7 +236,7 @@ tbmate view -cd -g cg00013374,cg00012123,cg00006867 TCGA_BLCA_A13J.tbk
 tbmate view -cd -i "idx.gz" -g chr19:246460-346460 TCGA_BLCA_A13J.tbk | less
 ```
 
-Viewing or querying from multiple .tbk files
+View or query from multiple .tbk files simultaneously
 ```
 cd Test/EPIC
 ls *.tbk
