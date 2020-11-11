@@ -18,7 +18,7 @@ tbmate is meant to solve/alleviate these challenges by de-coupling the data from
 3. Addresses are stored in plain text. Disk offset can be easily calculated.
 4. tbmate supports random disk output
 
-tbmate is currently implemented in C and R. It can easily be extended to other programming languages.
+tbmate is currently implemented in C, Python and R. It can easily be extended to other programming languages.
 
 ## Dependencies:
 - [tabix](http://www.htslib.org/doc/tabix.html)
@@ -47,11 +47,14 @@ wget -O tbmate "https://github.com/zhou-lab/tbmate/releases/download/1.6.2020091
 wget -O tbmate "https://github.com/zhou-lab/tbmate/releases/download/1.6.20200915/tbmate_darwin_amd64"
 
 chmod a+x tbmate
+```
 
-#Or install from source code.
+#Or install from source code:
+```
 git clone https://github.com/zhou-lab/tbmate
 cd tbmate
-make .
+make
+
 # Moving tbmate to /usr/bin
 mv tbmate /usr/bin
 ```
@@ -61,7 +64,7 @@ Python API is under [pytbmate](https://github.com/zhou-lab/tbmate/pytbmate)
 ## Usage
 
 **1. Building tabix index.**
-Download HM450 array manifest file and index it with tabix
+For example, downloading HM450 array manifest file and index it with tabix
 ```
 wget ftp://webdata2:webdata2@ussd-ftp.illumina.com/downloads/ProductFiles/HumanMethylation450/HumanMethylation450_15017482_v1-2.csv
 ```
@@ -135,7 +138,7 @@ chr1    69590   69592   699401  cg21870274
 ...
 ```
 
-Note most entries have -1s which indicate no Infinium EPIC array ID is spotted. `tbmate view -d` can optionally omit these in the display. All index files can be easily generated from the native address file.
+Note most entries have -1 which indicate no Infinium EPIC array ID is spotted. `tbmate view -d` can optionally omit these in the display. All index files can be easily generated from the native address file.
 
 
 ### Pack into .tbk files
@@ -157,6 +160,26 @@ Options:
     -h        This help
 
 Note, in.bed is an index-ordered bed file. Column 4 will be made a .tbk file.
+```
+
+For example:
+- Packing HM450 array data into .tbk.
+```
+cd Test/HM450/
+tbmate pack -s float -m "hm450_idx.bed.gz" example.bed.gz out.tbk  #Packing the 4th column into out.tbk
+# Or using tbmate after pipe to pack the 5th column into tbk file.
+zcat example.bed.gz | cut -f 1,2,3,5 |tbmate pack -m "hm450_idx.bed.gz" - GSM3417546.tbk
+```
+Please Note: the coordinate of example.bed.gz has been processed to be the same with hm450_idx.bed.gz.
+
+- Packing WGBS data into .tbk.
+```
+cd Test/WGBS/
+tbmate pack -s float -m "idx.gz" TCGA_BLCA_A13J_cpg.gz TCGA_BLCA_A13J.tbk
+ls TCGA_BLCA_A13J* -sh
+```
+```
+256M TCGA_BLCA_A13J_cpg.gz  127M TCGA_BLCA_A13J.tbk
 ```
 
 ### View .tbk files
@@ -182,6 +205,30 @@ Options:
     -p        precision used to print float[3]
     -u        show unaddressed (use -1)
     -R        file listing the regions
+```
+
+```
+# view header
+cd Test/WGBS/
+tbmate header TCGA_BLCA_A13J.tbk
+
+# view the whold data
+tbmate view -c TCGA_BLCA_A13J.tbk |less
+
+# query by a given genomic region (chr:start-end)
+tbmate view -c -g chr16:132813-132831 TCGA_BLCA_A13J.tbk
+
+# change index location
+tbmate header -m "hg38_to_EPIC.idx.gz" TCGA_BLCA_A13J.tbk
+
+# confirm it's changed
+tbmate header TCGA_BLCA_A13J.tbk   # See "Message: hg38_to_EPIC.idx.gz"
+
+# now using the new coordinates to query by EPIC probe ID.
+tbmate view -cd -g cg00013374,cg00012123,cg00006867 TCGA_BLCA_A13J.tbk
+
+# switch back without modify the header
+tbmate view -cd -i "idx.gz" -g chr19:246460-346460 TCGA_BLCA_A13J.tbk | less
 ```
 
 ### The tbk files
