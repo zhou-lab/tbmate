@@ -37,6 +37,9 @@ make install
 
 #Adding to your $PATH
 export PATH=/usr/local/htslib/bin:$PATH
+
+#To test whether tabix is installed
+tabix -h
 ```
 
 2. **Install tbmate**:
@@ -229,6 +232,14 @@ tbmate view -cd -g cg00013374,cg00012123,cg00006867 TCGA_BLCA_A13J.tbk
 
 # switch back without modify the header
 tbmate view -cd -i "idx.gz" -g chr19:246460-346460 TCGA_BLCA_A13J.tbk | less
+```
+
+Viewing or querying from multiple .tbk files
+```
+cd Test/EPIC
+ls *.tbk
+tbmate view -cd *.tbk |less #or export to a txt file with "> out.txt"
+tbmate view -cd -g cg00013684,cg00029587,rs7746156 *.tbk  #That would be very useful to query a given probes from many .tbk files.
 ```
 
 ### The tbk files
