@@ -68,8 +68,8 @@ Python API is under [pytbmate](https://github.com/zhou-lab/tbmate/pytbmate)
 
 A test dataset can be downloaded from [here](https://www.dropbox.com/)
 ```
-wget https://dropbox****/Test.zip
-unzip Test.zip
+wget https://dropbox****/Test.tar.gz
+tar zxvf Test.tar.gz
 ```
 
 **1. Building tabix index.**
