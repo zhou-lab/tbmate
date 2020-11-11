@@ -37,11 +37,11 @@ mv tbmate /usr/bin
 3. **Install pytbmate**:
 ```
 pip install pytabix
-pip install git+https://github.com/zhou-lab/tbmate/pytbmate
+pip install git+https://github.com/DingWB/pytbmate
 ```
 OR
 ```
-git clone https://github.com/zhou-lab/tbmate/pytbmate
+git clone https://github.com/DingWB/pytbmate
 cd pytbmate
 python setup.py install
 ```
@@ -91,7 +91,7 @@ import tbmate
 import pandas as pd
 
 idx_file="hm450_idx.bed.gz"
-data=pd.read_csv("example.bed.gz",sep='\t')
+data=pd.read_csv("example.bed.gz",sep='\t',header=None,names=['seqname','start','end','GSM3417545','GSM3417546',''GSM3417547'])
 data.head()
 
       seqname  start  end  GSM3417545  GSM3417546  GSM3417547
@@ -105,7 +105,6 @@ data.head()
 tbmate.to_tbk(data=data,cols=['GSM3417545','GSM3417546','GSM3417547'],idx=idx_file,dtypes='float')
 # Or you can pack a list/array into .tbk files:
 tbmate.pack_list(L=data['GSM3417545'].tolist(),idx=idx_file,dtype='float',outfile="test.tbk")
-
 ```
 
 - (2). Packing WGBS data.
@@ -155,4 +154,3 @@ tbk_files=[file for file in os.listdir("./") if file.endswith('.tbk')]
 idx_file='idx.gz'
 tbmate.QueryMultiSamples(tbk_files=tbk_files,seqname='cg27587195',idx=idx_file,dtype='float')
 ```
-
