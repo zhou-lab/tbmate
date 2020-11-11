@@ -66,6 +66,12 @@ Python API is under [pytbmate](https://github.com/zhou-lab/tbmate/pytbmate)
 
 ## Usage
 
+A test dataset can be downloaded from [here](https://www.dropbox.com/)
+```
+wget https://dropbox****/Test.zip
+unzip Test.zip
+```
+
 **1. Building tabix index.**
 
 For example, downloading HM450 array manifest file and index it with tabix
