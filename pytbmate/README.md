@@ -48,6 +48,7 @@ python setup.py install
 
 ## **Usage**
 **1. Building tabix index.**
+</br>
 Download HM450 array manifest file and index it with tabix
 ```
 wget ftp://webdata2:webdata2@ussd-ftp.illumina.com/downloads/ProductFiles/HumanMethylation450/HumanMethylation450_15017482_v1-2.csv
@@ -81,6 +82,7 @@ Similarly, a EPIC manifest file can be downloaded from [here](http://webdata.ill
 
 
 **2. Packing data into .tbk files.**
+
 - (1). Packing Hm450 array data.
 ```
 cd Test/HM450/
@@ -107,8 +109,10 @@ tbmate.to_tbk(data=data,cols=['GSM3417545','GSM3417546','GSM3417547'],idx=idx_fi
 tbmate.pack_list(L=data['GSM3417545'].tolist(),idx=idx_file,dtype='float',outfile="test.tbk")
 ```
 
-- (2). Packing WGBS data.
+- (2). Packing WGBS data.</br>
+```
 cd Test/WGBS/
+```
 Reading example .gz file  into python.
 ```
 import tbmate
@@ -129,16 +133,22 @@ data.head()
 tbmate.to_tbk(data=data,cols=['TCGA_BLCA_A13J'],idx=idx_file,dtypes='float',outdir="example")
 ```
 The function to_tbk would first make sure the coordinate of idx file and dataframe are the same.</br>
-If the order or the coordinates of these two files are already the same, Then you could directly use pack_list function without check.
+If the coordinates of these two files were already the same, Then you could directly use pack_list function, which would be faster.
 ```
 tbmate.pack_list(L=data['TCGA_BLCA_A13J'].tolist(),idx=idx_file,dtype='float',outfile="example/TCGA_BLCA_A13J.tbk")
 ```
+```
 ls -sh example/TCGA_BLCA_A13J*
-256M example/TCGA_BLCA_A13J_cpg.gz  127M example/TCGA_BLCA_A13J.tbk
+```
 
+```
+256M example/TCGA_BLCA_A13J_cpg.gz  127M example/TCGA_BLCA_A13J.tbk
+```
 
 **3. Query .tbk files.**
+```
 cd Test/EPIC
+```
 Query probe cg27587195 from one .tbk file.
 ```
 import tbmate
