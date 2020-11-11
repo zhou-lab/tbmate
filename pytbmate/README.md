@@ -118,7 +118,7 @@ Reading example .gz file  into python.
 import tbmate
 import pandas as pd
 idx_file="idx.gz"
-data=pd.read_csv("example/TCGA_BLCA_A13J_cpg.gz",sep='\t',header=None)
+data=pd.read_csv("TCGA_BLCA_A13J_cpg.gz",sep='\t',header=None)
 data.columns=['seqname','start','end','TCGA_BLCA_A13J','depth']
 data.head()
 
@@ -138,11 +138,11 @@ If the coordinates of these two files were already the same, Then you could dire
 tbmate.pack_list(L=data['TCGA_BLCA_A13J'].tolist(),idx=idx_file,dtype='float',outfile="example/TCGA_BLCA_A13J.tbk")
 ```
 ```
-ls -sh example/TCGA_BLCA_A13J*
+ls -sh TCGA_BLCA_A13J*
 ```
 
 ```
-256M example/TCGA_BLCA_A13J_cpg.gz  127M example/TCGA_BLCA_A13J.tbk
+256M TCGA_BLCA_A13J_cpg.gz  127M TCGA_BLCA_A13J.tbk
 ```
 
 **3. Query .tbk files.**
