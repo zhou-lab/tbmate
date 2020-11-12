@@ -78,6 +78,8 @@ For example, downloading HM450 array manifest file and index it with tabix
 ```
 wget ftp://webdata2:webdata2@ussd-ftp.illumina.com/downloads/ProductFiles/HumanMethylation450/HumanMethylation450_15017482_v1-2.csv
 ```
+This step can be skipped, HumanMethylation450_15017482_v1-2.csv has been downloaded and put under test/HM450
+
 Prepare tabix index file
 ```
 sed '1,8d' HumanMethylation450_15017482_v1-2.csv |cut -f 1 -d ","|grep -E "^cg|^ch|^rs" | sort -k1V |awk 'BEGIN {OFS="\t";} {print $0,1,2,NR-1}' | bgzip > hm450_idx.bed.gz
@@ -235,7 +237,7 @@ tbmate header -m "hg38_to_EPIC.idx.gz" TCGA_BLCA_A13J.tbk
 # confirm it's changed
 tbmate header TCGA_BLCA_A13J.tbk   # See "Message: hg38_to_EPIC.idx.gz"
 
-# now using the new coordinates to query by EPIC probe ID.
+# now we can use the new coordinates to query by EPIC probe ID.
 tbmate view -cd -g cg00013374,cg00012123,cg00006867 TCGA_BLCA_A13J.tbk
 
 # switch back without modify the header
@@ -246,8 +248,12 @@ View or query from multiple .tbk files simultaneously
 ```
 cd test/EPIC
 ls *.tbk
-tbmate view -cd *.tbk |less #or export to a txt file with "> out.txt"
-tbmate view -cd -g cg00013684,cg00029587,rs7746156 *.tbk  #That would be very useful to query a given probes from many .tbk files.
+tbmate view -cd *.tbk |less 
+tbmate view -cd -g cg00013684,cg00029587,rs7746156 *.tbk  
+#That would be very useful to query a given probes from many .tbk files.
+
+#Similarly, we can also query EPIC data by chromosome and posotion other than probe ID.
+tbmate view -acd -i EPIC_to_hg38.idx.gz -g chr20:31691842-31701844 *.tbk
 ```
 
 ### **4. The tbk files**
