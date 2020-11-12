@@ -193,7 +193,7 @@ ls TCGA_BLCA_A13J* -sh
 256M TCGA_BLCA_A13J_cpg.gz  127M TCGA_BLCA_A13J.tbk
 ```
 
-### **3.View .tbk files**
+### **3. View .tbk files**
 
 ```
 tbmate view input.tbk [more_input.tbk [...]]
@@ -267,7 +267,7 @@ tbmate header input.tbk
 The header subcommand will output the header inforamtion
 
 
-### **5.An example of packing and viewing CHIP-Seq dataset **
+### **5. An example of packing and viewing CHIP-Seq dataset**
 ```
 cd test/CHIP
 cut -f 1-4 example.bed |sort -k1V -k2n -k3n |awk 'BEGIN {OFS="\t";} {print $1,$2,$3,NR-1,$4}' | bgzip > idx.bed.gz
