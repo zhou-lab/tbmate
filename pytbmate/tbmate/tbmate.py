@@ -286,7 +286,7 @@ def Query(tbk_file=None,seqname=None,start=1,end=2,
     data=pd.DataFrame(R,columns=colnames[:len(R[0])])
     return data
 # =============================================================================
-def QueryOneSiteInMultiSamples(tbk_files=[],seqname=None,start=1,end=2,
+def QueryOneSiteInSamples(tbk_files=[],seqname=None,start=1,end=2,
           idx=None,base_idx=8192):
     """
     The function for querying multiple samples.
@@ -297,7 +297,12 @@ def QueryOneSiteInMultiSamples(tbk_files=[],seqname=None,start=1,end=2,
     idx: index file.
     base_idx: Number of index that should be skipped.
     Example:
-        time r=QueryOneSiteInMultiSamples(tbk_files,seqname,start,end,idx)
+        import os
+        import tbmate
+        seqname,start,end=['chr1',10483,10485]
+        tbk_files=['/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19/'+name for name in os.listdir('/mnt/isilon/zhou_lab/projects/20200928_EPIREJ/Wanding/rank')]
+        idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
+        time r=tbmate.QueryOneSiteInSamples(tbk_files,seqname,start,end,idx)
     """
     if idx is None:
         raise Exception("Please provide idx and dtype")
@@ -331,11 +336,13 @@ def QueryMultiSitesInSamples(tbk_files=[],coordinates=[],
     base_idx: Number of index that should be skipped.
     Return: A Python pandas dataframe with columns name of ['seqname','start','end','sample','v1','v2'].
     Example:
-        tbk_files=['/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19/'+name for name in os.listdir('rank/')]
+        import os
+        import tbmate
+        idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
+        tbk_files=['/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19/'+name for name in os.listdir('/mnt/isilon/zhou_lab/projects/20200928_EPIREJ/Wanding/rank')]
         coordinates=[['chr1',10483,10485],['chr2',11380,11382],['chr22',16085342,16085344]]
         idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
-        dtype='float_int'
-        r=QueryMultiSitesInSamples(tbk_files,coordinates,idx)
+        data=tbmate.QueryMultiSitesInSamples(tbk_files,coordinates,idx)
     """
     if idx is None:
         raise Exception("Please provide idx")
