@@ -162,5 +162,37 @@ Query probe cg27587195 from multiple .tbk file. If you have many sampels to quer
 import tbmate
 tbk_files=[file for file in os.listdir("./") if file.endswith('.tbk')]
 idx_file='idx.gz'
-tbmate.QueryMultiSamples(tbk_files=tbk_files,seqname='cg27587195',idx=idx_file,dtype='float')
+tbmate.QueryOneSiteInSamples(tbk_files=tbk_files,seqname='cg27587195',idx=idx_file)
+```
+
+#Query one cpg site from 390 .tbk files
+```
+import os
+import tbmate
+
+seqname,start,end=['chr1',10483,10485]
+tbk_files=['/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19/'+name for name in os.listdir('/mnt/isilon/zhou_lab/projects/20200928_EPIREJ/Wanding/rank')]
+idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
+time data=tbmate.QueryOneSiteInSamples(tbk_files,seqname,start,end,idx)
+#It takes only 1.5 second.
+```
+		
+
+#Query multiple cpg sites from 390 .tbk files. 
+#For example, if you want to query 3 cpgs from many .tbk files, Using QueryMultiSitesInSamples function would be faster than run QueryOneSiteInSamples for 3 times.
+```
+idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
+tbk_files=['/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19/'+name for name in os.listdir('/mnt/isilon/zhou_lab/projects/20200928_EPIREJ/Wanding/rank')]
+coordinates=[['chr1',10483,10485],['chr2',11380,11382],['chr22',16085342,16085344]]
+idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
+time data=tbmate.QueryMultiSitesInSamples(tbk_files,coordinates,idx)
+```
+#Output: A pandas dataframe, v1 is the methylation beta value and v2 is depth (if there was additional column), -1 is missing values (should be taken care by youself).
+```
+  seqname  start    end                                             sample        v1    v2
+0    chr1  10483  10485       Ziller_adult_sorted_CD8_330_draw_UW_RO_01736  0.843750  32.0
+1    chr1  10483  10485    BP_venous_blood_S0039051_macrophage_DiseaseFree -1.000000   0.0
+2    chr1  10483  10485                                      TCGA_GBM_1460  0.692308  13.0
+3    chr1  10483  10485                                REMC_E079_Esophagus  0.900000  40.0
+4    chr1  10483  10485  BP_venous_blood_C000S5A1bs_CD14positive_CD16ne...  0.812500  16.0
 ```
