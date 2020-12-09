@@ -19,7 +19,9 @@ dtype_fmt={
         'int':'i',
         'string':'s',
         'chr':'c',
-        'double':'d'
+        'double':'d',
+        'float_int':'fi',
+        'float_float':'ff',
         }
 
 dtype_map={
@@ -27,7 +29,9 @@ dtype_map={
         'float':4,
         'double':5,
         'string':7,
-        'chr':6
+        'chr':6,
+        'float_float':32,
+        'float_int':31
         }
 
 dtype_map_rev={
@@ -37,7 +41,9 @@ dtype_map_rev={
         4:'float',
         5:'double',
         6:'chr',
-        7:'string'
+        7:'string',
+        31:'float_int',
+        32:'float_float'
         }
 
 dtype_func={
@@ -53,7 +59,7 @@ def pack_header(idx,outfile,dtype):
     idx_len=len(idx)
     fo=open(outfile,'wb')
     fo.write(struct.pack('3s',b'tbk')) #'tbk',byte=3*1=3
-    fo.write(struct.pack('f',version)) #version:1; byte=4
+    fo.write(struct.pack('i',int(version))) #version:1; byte=4
     fo.write(struct.pack('q',dtype_map[dtype])) #dtype, bytes=8
 #    fo.write(struct.pack('i',idx_len)) #idx_len, byte=4
     fo.write(struct.pack('q',-1)) #max data, byte=8
@@ -77,7 +83,8 @@ def Pack(Input,idx='idx.gz',basename="out",cols_to_pack=[4],
     idx: index file, should be indexed with tabix.
     outfile: output .tbk file.
     cols_to_pack: The columns (1-based) to be packed.
-    dtype: 'float', 'int', 'string', 'chr','double'. The length of dtypes
+    dtype: 'float', 'int', 'string', 'chr','double', not support 'float_float','float_int' now.
+            The length of dtypes
             must be the same with cols_to_packpack
     """
     #Starting to write data
@@ -153,7 +160,8 @@ def to_tbk(data=None,cols=[],idx='idx.gz',outdir="./",
     idx: index file, should be indexed with tabix.
     cols: A list of columns to pack.
     out_basename: Output basename. If the length of cols > 1, outfile will be out_basename_col.tbk
-    dtypes: A string or a list of data type. 'float', 'int', 'string', 'chr','double'. dtypes should have the same length as cols.
+    dtypes: A string or a list of data type. 'float', 'int', 'string', 'chr','double'. or 'float_float','float_int' for packing 2 columns.
+            dtypes should have the same length as cols.
           If dtypes is a string, then it will be expanded to a list with the same length with cols.
     na: The NaN values in data will be replace with na, should be an integer.
     """
@@ -181,50 +189,50 @@ def to_tbk(data=None,cols=[],idx='idx.gz',outdir="./",
         pack_list(L=df_idx[col].tolist(),idx=idx,dtype=dtype,\
                   outfile=os.path.join(outdir,col+'.tbk'))
 # =============================================================================
-def Read(tbk_file,start,size,fmt):
+def Reader1(tbk_file,begain,fmt):
     """
     Reading one line from tbk file.
     tbk_file: .tbk
-    start: start index.
+    begain: begain index.
     size: bytes
-    fmt: f,s,c...,values of dtype_fmt.
+    fmt: f,s,c...,values of dtype_fmt, or a list, such as ['f','f'],['f','i']
+    Return: a value
     """
     with open(tbk_file,'rb') as f:
-        f.seek(start)
-        r=f.read(size)
+        f.seek(begain)
+        r=f.read(struct.calcsize(fmt))
     return struct.unpack(fmt,r)[0]
-# =============================================================================
-def ReadBulk(tbk_file,start,end,size,fmt):
+    
+def Reader2(tbk_file,begain,fmt):
     """
-    Readling multiple continious lines from .tbk.
+    Reading one line from tbk file.
     tbk_file: .tbk
-    start: start index.
-    end: end index.
+    begain: begain index.
     size: bytes
-    fmt: f,s,c...,values of dtype_fmt.
+    fmt: f,s,c...,values of dtype_fmt, or a list, such as ['f','f'],['f','i']
+    Return: a list
     """
-    R=[]
-    f=open(tbk_file,'rb')
-    f.seek(start)
-    while start <= end:
-        r=f.read(size)
-        R.append(struct.unpack(fmt,r)[0])
-        start+=size
-    f.close()
-    return R
+    fi=open(tbk_file,'rb')
+    result=[]
+    fi.seek(begain)
+    for f in fmt:
+        r=fi.read(struct.calcsize(f))
+        result.append(struct.unpack(f,r)[0])
+    fi.close()
+    return result
 # =============================================================================
 def Header(tbk_file):
-    identifier=Read(tbk_file,0,3,'3s') #'tbk',byte=3*1=3
+    identifier=Reader1(tbk_file,0,'3s') #'tbk',byte=3*1=3
     if identifier.decode('utf-8') != 'tbk':
         raise Exception("Input .tbk file is not standard tbk file.")
-    ver=Read(tbk_file,3,4,'f') #version:1; byte=4
-#    dtype=Read(tbk_file,7,4,'i') #dtype,byte=4
-    dtype=Read(tbk_file,7,8,'q') #dtype,byte=8
-#    idx_len=Read(tbk_file,11,4,'i') #idx_len, bytes=4
-#    idx=Read(tbk_file,15,idx_len,f'{idx_len}s') #idx,bytes=idx_len
+    ver=Reader1(tbk_file,3,'i') #version:1; byte=4
+#    dtype=Reader1(tbk_file,7,4,'i') #dtype,byte=4
+    dtype=Reader1(tbk_file,7,'q') #dtype,byte=8
+#    idx_len=Reader1(tbk_file,11,4,'i') #idx_len, bytes=4
+#    idx=Reader1(tbk_file,15,idx_len,f'{idx_len}s') #idx,bytes=idx_len
 #    idx=idx.decode('utf-8')
-    num=Read(tbk_file,15,8,'q') #maximum data length, byte=8
-    idx=Read(tbk_file,23,8169,'8169s')
+    num=Reader1(tbk_file,15,'q') #maximum data length, byte=8
+    idx=Reader1(tbk_file,23,'8169s')
     idx=idx.decode('utf-8').replace('\x00','')
     return [ver,dtype,num,idx]
 # =============================================================================
@@ -232,28 +240,22 @@ def read_one_site(tbk_file,line_num,fmt,base_idx=8192):
     """
     Query single line.
     """
-    size=struct.calcsize(fmt)
-    start=size*line_num+base_idx
-    return Read(tbk_file,start,size,fmt)
-# =============================================================================
-def read_multi_site(tbk_file,n1,n2,fmt,base_idx=8192):
-    """
-    Query multiple lines.
-    n1,n2: line number.
-    """
-    size=struct.calcsize(fmt)
-    start=size*n1+base_idx
-    end=size*n2+base_idx
-    return ReadBulk(tbk_file,start,end,size,fmt)
+    size=0
+    for f in fmt:
+        size+=struct.calcsize(f) #'f' and 'i' have the same size.
+    begain=size*line_num+base_idx
+    return Reader2(tbk_file,begain,fmt)
 # =============================================================================
 def read_multi_samples(tbk_files=[],n=0,fmt='f',base_idx=8192):
     """
     Query multiple lines.
     n1,n2: line number.
     """
-    size=struct.calcsize(fmt)
-    start=size*n+base_idx
-    R=[Read(tbk_file,start,size,fmt) for tbk_file in tbk_files]
+    size=0
+    for f in fmt:
+        size+=struct.calcsize(f)
+    begain=size*n+base_idx
+    R=[Reader2(tbk_file,begain,fmt) for tbk_file in tbk_files]
     return R
 # =============================================================================
 def Query(tbk_file=None,seqname=None,start=1,end=2,
@@ -274,16 +276,18 @@ def Query(tbk_file=None,seqname=None,start=1,end=2,
     fmt=dtype_fmt[dtype]
     tb = tabix.open(idx)
     records=tb.query(seqname,start,end)
-    lineNum=[record[3] for record in records]
-    if len(lineNum)==0:
-        return None
-    elif len(lineNum)==1:
-        return read_one_site(tbk_file,int(lineNum[0]),fmt,base_idx)
-    n1,n2=lineNum[0],lineNum[-1]
-    return read_multi_site(tbk_file,n1,n2,fmt,base_idx)
+    R=[]
+    colnames=['seqname','start','end','v1','v2']
+    for record in records:
+        r=read_one_site(tbk_file,int(record[3]),fmt,base_idx)
+        result=list(record[:3])
+        result.extend(r)
+        R.append(result)
+    data=pd.DataFrame(R,columns=colnames[:len(R[0])])
+    return data
 # =============================================================================
-def QueryMultiSamples(tbk_files=[],seqname=None,start=1,end=2,
-          idx=None,dtype=None,base_idx=8192):
+def QueryOneSiteInMultiSamples(tbk_files=[],seqname=None,start=1,end=2,
+          idx=None,base_idx=8192):
     """
     The function for querying multiple samples.
     tbk_file: input a file list.
@@ -291,24 +295,69 @@ def QueryMultiSamples(tbk_files=[],seqname=None,start=1,end=2,
     start: start position.
     end: end position.
     idx: index file.
-    dtype: dtype
     base_idx: Number of index that should be skipped.
+    Example:
+        time r=QueryOneSiteInMultiSamples(tbk_files,seqname,start,end,idx)
     """
-    if idx is None or dtype is None:
+    if idx is None:
         raise Exception("Please provide idx and dtype")
-    fmt=dtype_fmt[dtype]
     tb = tabix.open(idx)
     records=tb.query(seqname,start,end)
     lineNum=[record[3] for record in records]
     if len(lineNum)==0:
         return None
+    basenames=[os.path.basename(tbk_file).replace('.tbk','') for tbk_file in tbk_files]
     if len(lineNum)==1:
-        return [read_one_site(tbk_file,int(lineNum[0]),fmt,base_idx) for tbk_file in tbk_files]
+        r=[]
+        for tbk_file in tbk_files:
+            dtype=dtype_map_rev[Reader1(tbk_file,7,'q')]
+            fmt=dtype_fmt[dtype]
+            r.append(read_one_site(tbk_file,int(lineNum[0]),fmt,base_idx))
+        colnames=['v1','v2']
+        data=pd.DataFrame(r,columns=colnames[:len(r[0])])
+        data.insert(0,'sample',basenames)
+        return data
     else:
-        raise Exception("Not support querying of multiple position now.")
-#    n1,n2=lineNum[0],lineNum[-1]
-#
-#    return querys(tbk_file,n1,n2,fmt,base_idx)
+        raise Exception("Not support querying bulk now.")
+# =============================================================================      
+def QueryMultiSitesInSamples(tbk_files=[],coordinates=[],
+          idx=None,base_idx=8192):
+    """
+    The function for querying multiple samples.
+    tbk_file: input a file list.
+    coordinates: a list of list ([seqname,start,end])
+    idx: index file.
+    dtype: dtype, 'float_float' and 'float_int' are also supported.
+    base_idx: Number of index that should be skipped.
+    Return: A Python pandas dataframe with columns name of ['seqname','start','end','sample','v1','v2'].
+    Example:
+        tbk_files=['/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19/'+name for name in os.listdir('rank/')]
+        coordinates=[['chr1',10483,10485],['chr2',11380,11382],['chr22',16085342,16085344]]
+        idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
+        dtype='float_int'
+        r=QueryMultiSitesInSamples(tbk_files,coordinates,idx)
+    """
+    if idx is None:
+        raise Exception("Please provide idx")
+    tb = tabix.open(idx)
+    Indexs=[]
+    for seqname,start,end in coordinates:
+        records=tb.query(seqname,start,end)
+        for record in records:
+            Indexs.append(record)
+    if len(Indexs)==0:
+        return None
+    R=[]
+    colnames=['seqname','start','end','sample','v1','v2']
+    for record in Indexs:
+        for tbk_file in tbk_files:
+            dtype=dtype_map_rev[Reader1(tbk_file,7,'q')]
+            fmt=dtype_fmt[dtype]
+            basename=os.path.basename(tbk_file).replace('.tbk','')
+            r=read_one_site(tbk_file,int(record[3]),fmt,base_idx)
+            R.append(record[:3]+[basename]+r)
+    data=pd.DataFrame(R,columns=colnames[:len(R[0])])
+    return data
 # =============================================================================
 def View(tbk_file=None,idx=None,dtype=None,base_idx=8192):
     """

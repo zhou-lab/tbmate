@@ -133,7 +133,7 @@ if __name__=="__main__":
     else:#view
         if args.region:
             seqname,start,end=args.region
-            R=Query(tbk_file=args.infile,seqname=seqname,start=start,end=end,
+            R=View(tbk_file=args.infile,seqname=seqname,start=start,end=end,
               idx=None,dtype=None,base_idx=8192)
             print("seqname\tstart\tend\t%s"%os.path.basename(args.infile).replace('.tbk',''))
             if type(R) != list:
