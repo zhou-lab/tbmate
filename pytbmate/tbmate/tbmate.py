@@ -319,7 +319,8 @@ def QueryOneSiteInSamples(tbk_files=[],seqname=None,start=1,end=2,
             fmt=dtype_fmt[dtype]
             r.append(read_one_site(tbk_file,int(lineNum[0]),fmt,base_idx))
         colnames=['v1','v2']
-        data=pd.DataFrame(r,columns=colnames[:len(r[0])])
+        data=pd.DataFrame(r)
+        data.columns=colnames[:data.shape[1]]
         data.insert(0,'sample',basenames)
         return data
     else:
@@ -363,7 +364,8 @@ def QueryMultiSitesInSamples(tbk_files=[],coordinates=[],
             basename=os.path.basename(tbk_file).replace('.tbk','')
             r=read_one_site(tbk_file,int(record[3]),fmt,base_idx)
             R.append(record[:3]+[basename]+r)
-    data=pd.DataFrame(R,columns=colnames[:len(R[0])])
+    data=pd.DataFrame(R)
+    data.columns=colnames[:data.shape[1]]
     return data
 # =============================================================================
 def View(tbk_file=None,idx=None,dtype=None,base_idx=8192):
