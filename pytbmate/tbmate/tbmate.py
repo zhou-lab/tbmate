@@ -283,7 +283,8 @@ def Query(tbk_file=None,seqname=None,start=1,end=2,
         result=list(record[:3])
         result.extend(r)
         R.append(result)
-    data=pd.DataFrame(R,columns=colnames[:len(R[0])])
+    data=pd.DataFrame(R)
+    data.columns=colnames[:data.shape[1]]
     return data
 # =============================================================================
 def QueryOneSiteInSamples(tbk_files=[],seqname=None,start=1,end=2,
@@ -344,6 +345,7 @@ def QueryMultiSitesInSamples(tbk_files=[],coordinates=[],
         coordinates=[['chr1',10483,10485],['chr2',11380,11382],['chr22',16085342,16085344]]
         idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
         data=tbmate.QueryMultiSitesInSamples(tbk_files,coordinates,idx)
+        data=data.pivot_table(index=['seqname','start','end'],columns='sample',values='v1').reset_index()
     """
     if idx is None:
         raise Exception("Please provide idx")
@@ -366,6 +368,7 @@ def QueryMultiSitesInSamples(tbk_files=[],coordinates=[],
             R.append(record[:3]+[basename]+r)
     data=pd.DataFrame(R)
     data.columns=colnames[:data.shape[1]]
+    #data.pivot_table(index=['seqname','start','end'],columns='sample',values='v1').reset_index()
     return data
 # =============================================================================
 def View(tbk_file=None,idx=None,dtype=None,base_idx=8192):

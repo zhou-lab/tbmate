@@ -78,6 +78,12 @@ Simple query with tabix:
 tabix hm450_idx.bed.gz cg18478105:1-2
 ```
 
+Generating index for WGBS cpg sites:
+```
+zcat cpg_noDecoy.bed.gz | sort -k1V -k2n -k3n | awk 'BEGIN {OFS="\t"} {print($0,NR-1)}' | bgzip > idx.gz
+tabix -s 1 -b 2 -e 3 -0 idx.gz
+```
+
 Similarly, a EPIC manifest file can be downloaded from [here](http://webdata.illumina.com.s3-website-us-east-1.amazonaws.com/downloads/productfiles/methylationEPIC/infinium-methylationepic-v5-manifest-file-csv.zip). To save time, we provided the index files and tabix index for EPIC and WGBS in [test dataset](https://).
 
 
