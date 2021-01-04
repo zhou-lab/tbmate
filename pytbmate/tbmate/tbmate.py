@@ -387,11 +387,15 @@ def read_idx_from_tbk(fi,tbk_file,line_num,fmt,total_size=8,\
         result.append(struct.unpack(f,r)[0])
     return result
 # =============================================================================
-def QueryByIndex(Index=None,tbk_files=None):
+def QueryByIndex(Index=None,tbk_files=None,fmt='fi'):
     """
     Index: a list of offset (index from idx file).
     tbk_files: a list of .tbk files
+    fmt: 'f' for one column (methylation), 'fi' or 'ff' for two columns (methylation and depth).
+    return: two dataframe: DNA methylation and depth.
     """
+    total_size=struct.calcsize(fmt)
+    single_size=4
     data=pd.DataFrame(Index,columns='idx')
     depth=data.copy()
     for tbk_file in tbk_files:
@@ -399,9 +403,10 @@ def QueryByIndex(Index=None,tbk_files=None):
         infile=os.path.abspath(tbk_file)
         fi=open(infile,'rb')
         sname=tbk_file.replace('.tbk','')
-        R=data.idx.apply(lambda x:read_idx_from_tbk(fi,infile,line_num=x,fmt='fi'))
+        R=data.idx.apply(lambda x:read_idx_from_tbk(fi,infile,line_num=x,fmt=fmt,total_size=total_size,single_size=single_size))
         data[sname]=R.apply(lambda x:x[0])
-        depth[sname]=R.apply(lambda x:x[1])
+        if total_size==8:
+            depth[sname]=R.apply(lambda x:x[1])
         fi.close()
     data.replace(-1,np.nan,inplace=True)
     depth.replace(-1,np.nan,inplace=True)
