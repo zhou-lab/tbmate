@@ -334,7 +334,9 @@ tbk_data <- function(
 
     ## add row names
     if (!all_units) {
+        snames <- names(data)
         data <- do.call(cbind, data)
+        colnames(data) <- snames
     }
     ## if (!is.null(chrm)) {
     ##     if (as.matrix && ncol(df)>=5) {
