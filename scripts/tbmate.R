@@ -66,7 +66,7 @@ tbk_hdrs <- function(tbk_fnames) {
     })
 }
 
-tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE) {
+tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE, config = config) {
 
     read_unit_default <- function() {
         cbind(
@@ -81,6 +81,7 @@ tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE) {
             d0 <- readBin(in_file, "raw", hdr$num*8, 1)
             d1 <- readBin(d0[bitwAnd(bitwShiftR(seq_along(d0)+3,2),1) == 1], 'numeric', hdr$num, 4)
             d2 <- readBin(d0[bitwAnd(bitwShiftR(seq_along(d0)+3,2),1) == 0], 'numeric', hdr$num, 4)
+            d1[d2 > config$max_pval] <- NA
             if (all_units) {
                 cbind(sig=d1, sig2=d2)
             } else {
@@ -91,6 +92,7 @@ tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE) {
             d0 <- readBin(in_file, "raw", hdr$num*8, 1)
             d1 <- readBin(d0[bitwAnd(bitwShiftR(seq_along(d0)+3,2),1) == 1], 'numeric', hdr$num, 4)
             d2 <- readBin(d0[bitwAnd(bitwShiftR(seq_along(d0)+3,2),1) == 0], 'integer', hdr$num, 4)
+            d1[d2 < config$min_coverage] <- NA
             if (all_units) {
                 cbind(sig=d1, sig2=d2)
             } else {
@@ -106,19 +108,19 @@ tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE) {
     data
 }
 
-tbk_data_bulk <- function(tbk_fnames, idx_addr, all_units = FALSE) {
+tbk_data_bulk <- function(tbk_fnames, idx_addr, all_units = FALSE, config = config) {
     idx_addr <- sort(idx_addr)
     data <- lapply(tbk_fnames, function(tbk_fname) {
         in_file <- file(tbk_fname,'rb')
         on.exit(close(in_file))
         hdr <- tbk_hdr(in_file)
         idx_addr <- ifelse(idx_addr < 0, NA, idx_addr)
-        tbk_read_chunk(in_file, hdr, idx_addr, all_units = all_units)
+        tbk_read_chunk(in_file, hdr, idx_addr, all_units = all_units, config = config)
     })
     data
 }
 
-tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE) {
+tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = config) {
     
     read_unit1 <- list(
         'INT1' = function(idx_addr) {
@@ -197,6 +199,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE) {
                 curr_offset <<- curr_offset + 1
                 d1 = readBin(in_file, "numeric", 1, 4)
                 d2 = readBin(in_file, "integer", 1, 4)
+                d1[d2 > config$min_coverage] <- NA
                 if (all_units) {
                     c(d1, d2)
                 } else {
@@ -214,6 +217,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE) {
                 curr_offset <<- curr_offset + 1
                 d1 = readBin(in_file, "numeric", 1, 4)
                 d2 = readBin(in_file, "numeric", 1, 4)
+                d1[d2 > config$max_pval] <- NA
                 if (all_units) {
                     c(d1, d2)
                 } else {
@@ -227,23 +231,23 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE) {
     read_unit1[[hdr$dtype]](idx_addr)        
 }
 
-tbk_data_addr <- function(tbk_fnames, idx_addr, all_units = FALSE) {
+tbk_data_addr <- function(tbk_fnames, idx_addr, all_units = FALSE, config = config) {
     idx_addr <- sort(idx_addr)
     data <- lapply(tbk_fnames, function(tbk_fname) {
         in_file <- file(tbk_fname,'rb')
         on.exit(close(in_file))
         hdr <- tbk_hdr(in_file)
-        tbk_read_unit(in_file, idx_addr, hdr, all_units = FALSE)
+        tbk_read_unit(in_file, idx_addr, hdr, all_units = FALSE, config = config)
     })
 }
 
-tbk_data0 <- function(tbk_fnames, idx_addr, all_units = FALSE, max_addr = 3000, max_source = 10^6) {
+tbk_data0 <- function(tbk_fnames, idx_addr, all_units = FALSE, max_addr = 3000, max_source = 10^6, config = config) {
 
     ## read whole data set only if there are too many addresses but too small source data
     if (tbk_hdrs(tbk_fnames[1])[[1]]$num < max_source && length(idx_addr) < max_addr) {
-        tbk_data_addr(tbk_fnames, idx_addr, all_units = all_units)
+        tbk_data_addr(tbk_fnames, idx_addr, all_units = all_units, config = config)
     } else {
-        tbk_data_bulk(tbk_fnames, idx_addr, all_units = all_units)
+        tbk_data_bulk(tbk_fnames, idx_addr, all_units = all_units, config = config)
     }
 }
 
@@ -323,7 +327,9 @@ tbk_data <- function(
         }
     }
 
-    data <- tbk_data0(tbk_fnames, idx_addr, max_addr=max_addr, max_source=max_source, all_units=all_units)
+    config <- list(max_pval = max_pval, min_coverage = min_coverage)
+
+    data <- tbk_data0(tbk_fnames, idx_addr, max_addr=max_addr, max_source=max_source, all_units=all_units, config = config)
 
     ## add column names
     if (name.use.base) {
