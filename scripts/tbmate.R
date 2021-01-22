@@ -282,13 +282,14 @@ infer_idx <- function(tbk_fname) {
 #' @param max_pval maximum sig2 for float.float
 #' @param min_coverage minimum sig2 for float.int
 #' @param name.use.base use basename for sample name
+#' @param negative.as.na NA-mask negative value
 #' @param max_addr random addressing if under max_addr
 #' @param min_source random addressing if source size is under min_source
 #' @return numeric matrix
 #' @export
 tbk_data <- function(
     tbk_fnames, idx_fname = NULL, probes = NULL, show.unaddressed = FALSE,
-    chrm = NULL, beg = NULL, end = NULL, as.matrix = FALSE,
+    chrm = NULL, beg = NULL, end = NULL, as.matrix = FALSE, negative.as.na = TRUE,
     simplify = FALSE, name.use.base=TRUE, max_addr = 3000, max_source = 10^6,
     max_pval = 0.05, min_coverage = 5, all_units = FALSE) {
 
@@ -343,6 +344,10 @@ tbk_data <- function(
         snames <- names(data)
         data <- do.call(cbind, data)
         colnames(data) <- snames
+    }
+
+    if (negative.as.na) {
+        data[data < 0] <- NA
     }
     ## if (!is.null(chrm)) {
     ##     if (as.matrix && ncol(df)>=5) {
