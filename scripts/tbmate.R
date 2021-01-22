@@ -85,7 +85,7 @@ tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE, config = c
             if (all_units) {
                 cbind(sig=d1, sig2=d2)
             } else {
-                d1
+                cbind(d1)
             }
         },
         'FLOAT_INT' = function() {
@@ -96,7 +96,7 @@ tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE, config = c
             if (all_units) {
                 cbind(sig=d1, sig2=d2)
             } else {
-                d1
+                cbind(d1)
             }
         },
         'INT32' = read_unit_default, 'FLOAT' = read_unit_default, 'DOUBLE' = read_unit_default
@@ -199,7 +199,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = co
                 curr_offset <<- curr_offset + 1
                 d1 = readBin(in_file, "numeric", 1, 4)
                 d2 = readBin(in_file, "integer", 1, 4)
-                d1[d2 > config$min_coverage] <- NA
+                d1[d2 < config$min_coverage] <- NA
                 if (all_units) {
                     c(d1, d2)
                 } else {
