@@ -84,7 +84,7 @@ tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE) {
             if (all_units) {
                 cbind(sig=d1, sig2=d2)
             } else {
-                cbind(sig=d1)
+                d1
             }
         },
         'FLOAT_INT' = function() {
@@ -94,7 +94,7 @@ tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE) {
             if (all_units) {
                 cbind(sig=d1, sig2=d2)
             } else {
-                cbind(sig=d1)
+                d1
             }
         },
         'INT32' = read_unit_default, 'FLOAT' = read_unit_default, 'DOUBLE' = read_unit_default
