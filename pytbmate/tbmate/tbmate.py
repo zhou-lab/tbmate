@@ -402,7 +402,7 @@ def QueryByIndex(Index=None,tbk_files=None,fmt='fi'):
         print(tbk_file)
         infile=os.path.abspath(tbk_file)
         fi=open(infile,'rb')
-        sname=tbk_file.replace('.tbk','')
+        sname=os.path.basename(tbk_file).replace('.tbk','')
         R=data.idx.apply(lambda x:read_idx_from_tbk(fi,infile,line_num=x,fmt=fmt,total_size=total_size,single_size=single_size))
         data[sname]=R.apply(lambda x:x[0])
         if total_size==8:
