@@ -27,6 +27,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <wordexp.h>
 #include "tbmate.h"
 #include "wzmisc.h"
 #include "wzio.h"
@@ -505,6 +506,12 @@ int main_view(int argc, char *argv[]) {
 
       /* get real path */
       char buf[PATH_MAX];
+
+      wordexp_t result;
+      wordexp(tbks[i].extra, &result, 0);
+      strcpy(tbks[i].extra, result.we_wordv[0]);
+      wordfree(&result);
+      
       if (tbks[i].extra[0] == '/') {
         strcpy(buf, tbks[i].extra);
       } else {
@@ -514,6 +521,7 @@ int main_view(int argc, char *argv[]) {
         strcat(buf, "/");
         strcat(buf, tbks[i].extra);
       }
+
       char *res = realpath(buf, NULL);
       if (res) {
         DIR *d = opendir(res);
