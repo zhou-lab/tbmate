@@ -544,3 +544,21 @@ tabixRetrieve <- function(
 
     df_list
 }
+
+
+## requires tbk and platform column in samples
+tbk_data2 <- function(samples, probes=NULL, max_pval=0.2) {
+
+    platform2idx = c(
+        EPIC='~/references/InfiniumArray/EPIC/EPIC.idx.gz',
+        HM450='~/references/InfiniumArray/HM450/HM450.idx.gz')
+
+    platforms <- unique(samples$platform)
+    betases <- lapply(platforms, function(x) {
+        tbk_data(
+            samples$tbk,
+            idx_fname = platform2idx,
+            probes = probes, max_pval = max_pval)
+    })
+    do.call(cbind_betas_onCommon, betases)
+}
