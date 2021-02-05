@@ -555,9 +555,10 @@ tbk_data2 <- function(samples, probes=NULL, max_pval=0.2) {
 
     platforms <- unique(samples$platform)
     betases <- lapply(platforms, function(x) {
+        spl <- samples[samples$platform == x,]
         tbk_data(
-            samples$tbk,
-            idx_fname = platform2idx,
+            spl$tbk,
+            idx_fname = platform2idx[x],
             probes = probes, max_pval = max_pval)
     })
     do.call(cbind_betas_onCommon, betases)
