@@ -545,6 +545,12 @@ tabixRetrieve <- function(
     df_list
 }
 
+cbind_betas_onCommon <- function(...) {
+    input <- list(...)
+    common <- Reduce(intersect, lapply(input, rownames))
+    do.call(cbind, lapply(input, function(x) x[common,]))
+}
+
 
 ## requires tbk and platform column in samples
 tbk_data2 <- function(samples, probes=NULL, max_pval=0.2) {
