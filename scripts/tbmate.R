@@ -544,3 +544,29 @@ tabixRetrieve <- function(
 
     df_list
 }
+
+cbind_betas_onCommon <- function(...) {
+    input <- list(...)
+    common <- Reduce(intersect, lapply(input, rownames))
+    do.call(cbind, lapply(input, function(x) x[common,]))
+}
+
+
+tbk_data2 <- function(samples, probes=NULL, max_pval=0.2) {
+    ## requires sample, tbk and platform column in samples
+    platform2idx = c(
+        EPIC='~/references/InfiniumArray/EPIC/EPIC.idx.gz',
+        HM450='~/references/InfiniumArray/HM450/HM450.idx.gz')
+
+    platforms <- unique(samples$platform)
+    betases <- lapply(platforms, function(x) {
+        spl <- samples[samples$platform == x,]
+        betas <- tbk_data(
+            spl$tbk,
+            idx_fname = platform2idx[x],
+            probes = probes, max_pval = max_pval)
+        colnames(betas) <- spl$sample
+        betas
+    })
+    do.call(cbind_betas_onCommon, betases)
+}
