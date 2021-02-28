@@ -23,7 +23,7 @@ tbk_hdr <- function(tbk_file) {
     tbk_version <- readBin(tbk_file, integer(), 1, 4)
     dtype <- readBin(tbk_file, integer(), 1, 8)
     num <- readBin(tbk_file, integer(), 1, 8)
-    msg <- rawToChar(readBin(tbk_file, raw(), HDR_EXTRA, 1))
+    msg <- rawToChar(readBin(tbk_file, raw(), HDR_EXTRA, 1), multiple=TRUE)
     out <- structure(list(
         tbk_version = tbk_version,
         dtype = names(dtypes)[dtypes==bitwAnd(dtype, 0xff)],
