@@ -121,7 +121,7 @@ tbk_data_bulk <- function(tbk_fnames, idx_addr, all_units = FALSE, config = conf
 }
 
 tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = config) {
-    
+
     read_unit1 <- list(
         'INT1' = function(idx_addr) {
             vapply(idx_addr, function(offset) {
@@ -132,7 +132,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = co
                 }
                 curr_offset <<- curr_offset + n
                 readBin(in_file, "integer", 1, 1) # FIXME
-            })
+            }, integer(1))
         },
         'INT2' = function(idx_addr) {
             vapply(idx_addr, function(offset) {
@@ -143,7 +143,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = co
                 }
                 curr_offset <<- curr_offset + 1
                 readBin(in_file, "integer", 1, 1) # FIXME
-            })
+            }, integer(1))
         },
         'FLOAT' = function(idx_addr) {
             vapply(idx_addr, function(offset) {
@@ -165,7 +165,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = co
                 }
                 curr_offset <<- curr_offset + 1
                 readBin(in_file, "numeric", 1, 4)
-            })
+            }, numeric(1))
         },
         'INT32' = function(idx_addr) {
             vapply(idx_addr, function(offset) {
@@ -176,7 +176,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = co
                 }
                 curr_offset <<- curr_offset + 1
                 readBin(in_file, "integer", 1, 4)
-            })
+            }, integer(1))
         },
         'ONES' = function(idx_addr) {
             vapply(idx_addr, function(offset) {
@@ -187,7 +187,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = co
                 }
                 curr_offset <<- curr_offset + 1
                 (as.numeric(readBin(in_file, 'integer', 1, 2, signed=FALSE)) - MAX_DOUBLE16) / MAX_DOUBLE16
-            })
+            }, numeric(1))
         },
         'FLOAT_INT' = function(idx_addr) {
             vapply(idx_addr, function(offset) {
@@ -205,7 +205,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = co
                 } else {
                     d1
                 }
-            })
+            }, numeric(1)) # FIXME: under all_units should be multiple
         },
         'FLOAT_FLOAT' = function(idx_addr) {
             vapply(idx_addr, function(offset) {
@@ -223,7 +223,7 @@ tbk_read_unit <- function(in_file, idx_addr, hdr, all_units = FALSE, config = co
                 } else {
                     d1
                 }
-            })
+            }, numeric(1)) # FIXME: under all_units, should be numeric(2)
         }
     )
 
@@ -235,6 +235,7 @@ tbk_data_addr <- function(tbk_fnames, idx_addr, all_units = FALSE, config = conf
     idx_addr <- sort(idx_addr)
     data <- lapply(tbk_fnames, function(tbk_fname) {
         in_file <- file(tbk_fname,'rb')
+        if (is.null(in_file)) stop(sprintf("File %s is unreadable.", in_file))
         on.exit(close(in_file))
         hdr <- tbk_hdr(in_file)
         tbk_read_unit(in_file, idx_addr, hdr, all_units = FALSE, config = config)
