@@ -257,7 +257,6 @@ infer_idx <- function(tbk_fname) {
             file.exists(file.path(dirname(tbk_fname), 'idx.gz.tbi'))) {
         idx_fname <- file.path(dirname(tbk_fname), 'idx.gz')
     } else {
-        tbk_fname = '/Users/zhouw3/zhoulab/labprojects/20200228_Mouse_Array_Project/20210104_mouse_array_data_analysis/tbk_MM285/204875570056_R06C02.tbk'
         hdr <- tbk_hdrs(tbk_fname)[[1]]
         if (!is.null(hdr$msg) && file.exists(hdr$msg)) {
             idx_fname <- hdr$msg
