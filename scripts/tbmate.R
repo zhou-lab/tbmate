@@ -260,8 +260,9 @@ infer_idx <- function(tbk_fname) {
         hdr <- tbk_hdrs(tbk_fname)[[1]]
         if (!is.null(hdr$msg) && file.exists(hdr$msg)) {
             idx_fname <- hdr$msg
+        } else {
+            stop("Cannot locate index file. Provide through idx_fname.\n")
         }
-        stop("Cannot locate index file. Provide through idx_fname.\n")
     }
     idx_fname
 }
