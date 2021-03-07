@@ -26,8 +26,6 @@
 
 #include <dirent.h>
 #include <stdlib.h>
-#include <limits.h>
-#include <wordexp.h>
 #include "tbmate.h"
 #include "wzmisc.h"
 #include "wzio.h"
@@ -106,125 +104,94 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
 
   /* when the offset is unfound */
   if (offset < 0) { fputs("\t-1", out_fh); return; }
-  if (offset >= tbk->offset_max) {wzfatal("Error: query %d out of range. Wrong idx file?", offset);}
+  if (offset >= tbk->nmax) {wzfatal("Error: query %d out of range. Wrong idx file?", offset);}
 
   switch(DATA_TYPE(tbk->dtype)) {
-  case DT_INT1: {
-    if(tbk->offset == 0 || offset/8 != tbk->offset-1) { /* need to read? */
-      if(offset/8 != tbk->offset) {                     /* need to seek? */
-        tbk->offset = offset/8;
-        if(fseek(tbk->fh, offset/8+HDR_TOTALBYTES, SEEK_SET))
-          wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      }
-      fread(&(tbk->data), 1, 1, tbk->fh); tbk->offset++;
-    }
-    fprintf(out_fh, "\t%d", ((tbk->data)>>(offset%8)) & 0x1);
-    break;
-  }
-  case DT_INT2: {
-    if(tbk->offset == 0 || offset/4 != tbk->offset-1) { /* need to read? */
-      if(offset/4 != tbk->offset) {                       /* need to seek? */
-        tbk->offset = offset/4;
-        if(fseek(tbk->fh, offset/4+HDR_TOTALBYTES, SEEK_SET))
-          wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      }
-      fread(&(tbk->data), 1, 1, tbk->fh); tbk->offset++;
-    }
-    fprintf(out_fh, "\t%d", ((tbk->data)>>((offset%4)*2)) & 0x3);
-    break;
-  }
+  /* case DT_INT1: { */
+  /*   if(tbk->offset == 0 || offset/8 != tbk->offset-1) { /\* need to read? *\/ */
+  /*     if(offset/8 != tbk->offset) {                     /\* need to seek? *\/ */
+  /*       tbk->offset = offset/8; */
+  /*       if(fseek(tbk->fh, offset/8+HDR_TOTALBYTES, SEEK_SET)) */
+  /*         wzfatal("File %s cannot be seeked.\n", tbk->fname); */
+  /*     } */
+  /*     fread(&(tbk->data), 1, 1, tbk->fh); tbk->offset++; */
+  /*   } */
+  /*   fprintf(out_fh, "\t%d", ((tbk->data)>>(offset%8)) & 0x1); */
+  /*   break; */
+  /* } */
+  /* case DT_INT2: { */
+  /*   if(tbk->offset == 0 || offset/4 != tbk->offset-1) { /\* need to read? *\/ */
+  /*     if(offset/4 != tbk->offset) {                       /\* need to seek? *\/ */
+  /*       tbk->offset = offset/4; */
+  /*       if(fseek(tbk->fh, offset/4+HDR_TOTALBYTES, SEEK_SET)) */
+  /*         wzfatal("File %s cannot be seeked.\n", tbk->fname); */
+  /*     } */
+  /*     fread(&(tbk->data), 1, 1, tbk->fh); tbk->offset++; */
+  /*   } */
+  /*   fprintf(out_fh, "\t%d", ((tbk->data)>>((offset%4)*2)) & 0x3); */
+  /*   break; */
+  /* } */
   case DT_INT32: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*4+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-    
+    tbk_seek_n(tbk, offset);
     int data;
-    fread(&data, 4, 1, tbk->fh); tbk->offset++;
+    tbf_read(tbk->tbf, &data, 4, 1);
     if (conf->na_for_negative && data < 0) {
       fputc('\t', out_fh); fputs(conf->na_token, out_fh);
     } else fprintf(out_fh, "\t%d", data);
     break;
   }
   case DT_FLOAT: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*4+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-    
+    tbk_seek_n(tbk, offset);    
     float data;
-    fread(&data, 4, 1, tbk->fh); tbk->offset++;
+    tbf_read(tbk->tbf, &data, 4, 1);
     if (conf->na_for_negative && data < 0) {
       fputc('\t', out_fh); fputs(conf->na_token, out_fh);
     } else fprintf(out_fh, "\t%f", data);
     break;
   }
   case DT_DOUBLE: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-    
+    tbk_seek_n(tbk, offset);
     double data;
-    fread(&data, 8, 1, tbk->fh); tbk->offset++;
+    tbf_read(tbk->tbf, &data, 8, 1);
     if (conf->na_for_negative && data < 0) {
       fputc('\t', out_fh); fputs(conf->na_token, out_fh);
     } else fprintf(out_fh, "\t%f", data);
     break;
   }
   case DT_STRINGF: {
+    tbk_seek_n(tbk, offset);
+    
     uint64_t n = STRING_MAX(tbk->dtype);
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*n+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-
     if (!*aux) *aux = malloc(n+1);
-    fread(*aux, 1, n, tbk->fh); tbk->offset++;
+    tbf_read(tbk->tbf, *aux, 1, n);
     if ((*aux)[n-1] != '\0') (*aux)[n] = '\0';
     fputc('\t', out_fh);
     fputs(*aux, out_fh);
     break;
   }
   case DT_STRINGD: {
-    if (offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
+    tbk_seek_n(tbk, offset);
 
     int64_t string_offset;
-    fread(&string_offset, 8, 1, tbk->fh); tbk->offset++;
-
-    if (fseek(tbk->fh, string_offset+tbk->offset_max*8+HDR_TOTALBYTES, SEEK_SET))
-      wzfatal("File %s cannot be seeked.\n", tbk->fname);
+    tbf_read(tbk->tbf, &string_offset, 8, 1);
+    tbk_seek_offset(tbk, string_offset + tbk->nmax*8);
 
     kstring_t ks = {0};
     char c;
     while (1) {
-      fread(&c, 1,1,tbk->fh);
+      tbf_read(tbk->tbf, &c, 1, 1);
       if (c) kputc(c, &ks);
       else break;
     }
     if (ks.s) { fputc('\t', out_fh); fputs(ks.s, out_fh); }
     free(ks.s);
-
-    tbk->offset = -1; // need to be reset
     break;
   }
   case DT_ONES: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*2+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
+    tbk_seek_n(tbk, offset);
     
     uint16_t data;
-    fread(&data, 2, 1, tbk->fh); tbk->offset++;
+    tbf_read(tbk->tbf, &data, 2, 1);
     float dataf = uint16_to_float(data);
     if (conf->na_for_negative && dataf < 0) {
       fputc('\t', out_fh); fputs(conf->na_token, out_fh);
@@ -233,14 +200,11 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     break;
   }
   case DT_FLOAT_INT: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
+    tbk_seek_n(tbk, offset);
     
     float data; int data2;
-    fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
+    tbf_read(tbk->tbf, &data, 4, 1);
+    tbf_read(tbk->tbf, &data2, 4, 1);
 
     if (conf->na_for_negative && data < 0) {
       fputc('\t', out_fh); fputs(conf->na_token, out_fh);
@@ -255,15 +219,12 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
     break;
   }
   case DT_FLOAT_FLOAT: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
+    tbk_seek_n(tbk, offset);
     
     float data,  data2;
-    fread(&data, 4, 1, tbk->fh); fread(&data2, 4, 1, tbk->fh); tbk->offset++;
-
+    tbf_read(tbk->tbf, &data, 4, 1);
+    tbf_read(tbk->tbf, &data2, 4, 1);
+    
     if (conf->na_for_negative && data < 0) {
       fputc('\t', out_fh); fputs(conf->na_token, out_fh);
     } else {
@@ -280,13 +241,13 @@ void tbk_query(tbk_t *tbk, int64_t offset, view_conf_t *conf, FILE *out_fh, char
   }
 }
 
-static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n_tbks, view_conf_t *conf, FILE *out_fh) {
+static int query_regions(
+  char *fname, char **regs, int nregs,
+  tbk_t *tbks, int n_tbks, view_conf_t *conf, FILE *out_fh) {
+  
   int i;
   htsFile *fp = hts_open(fname,"r");
   if(!fp) error("Could not read %s\n", fname);
-
-  int k;
-  for(k=0; k<n_tbks; ++k) tbk_open(&tbks[k]);
 
   tbx_t *tbx = tbx_index_load(fname);
   if(!tbx) error("Could not load .tbi/.csi index of %s\n", fname);
@@ -297,7 +258,7 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
   int nfields = -1;
   char *aux = NULL; char *aux2 = NULL;
   
-  int offset, ii;
+  int offset, ii, k;
   int linenum=0;
   for(i=0; i<nregs; i++) {
     hts_itr_t *itr = tbx_itr_querys(tbx, regs[i]);
@@ -343,8 +304,6 @@ static int query_regions(char *fname, char **regs, int nregs, tbk_t *tbks, int n
 
   if(hts_close(fp)) error("hts_close returned non-zero status: %s\n", fname);
 
-  for(k=0; k<n_tbks; ++k) tbk_close(&tbks[k]);
-
   for(i=0; i<nregs; i++) free(regs[i]);
   free(regs);
   return 0;
@@ -381,14 +340,113 @@ static int usage(view_conf_t *conf) {
   return 1;
 }
 
-void tbk_set_sname_by_fname(tbk_t *tbk) {
-  char *tmp = strdup(tbk->fname);
-  char *bname = basename(tmp);
-  int k = strlen(bname);
-  if (k>4 && bname[k-4]=='.' && bname[k-3]=='t' && bname[k-2]=='b' && bname[k-1]=='k')
-    bname[k-4] = '\0';
-  tbk->sname = strdup(bname);
-  free(tmp);
+static void parse_tbf_from_argument(
+  int argc, char **argv, int optind,
+  tbf_t **tbfs, int *n_tbfs) {
+  
+  int i;
+  struct dirent *dir;
+  char *fname;
+  for(i=0; optind < argc; optind++, i++) {
+    /* if it's a directory then list all the .tbk files inside */
+    DIR* d = opendir(argv[optind]);
+    if (d) { /* Directory exists */
+      while ((dir = readdir(d)) != NULL) {
+        if (strlen(dir->d_name) > 4 &&
+            strcmp(dir->d_name + strlen(dir->d_name) - 4, ".tbk")==0) {
+
+          /* identify actual file name */
+          fname = malloc(strlen(argv[optind]) + strlen(dir->d_name) + 5);
+          strcpy(fname, argv[optind]);
+          strcat(fname, "/");
+          strcat(fname, dir->d_name);
+
+          (*tbfs) = realloc((*tbfs), (++(*n_tbfs)) * sizeof(tbf_t));
+          tbf_open1(fname, &(*tbfs)[*n_tbfs-1], NULL);
+          free(fname);
+        }
+      }
+      closedir(d);
+    } else {
+      (*tbfs) = realloc((*tbfs), (++(*n_tbfs)) * sizeof(tbf_t));
+      tbf_open1(argv[optind], &(*tbfs)[*n_tbfs-1], NULL);
+    }
+  }
+}
+
+static void parse_tbf_fname_list(
+  char *tbk_fname_list,
+  tbf_t **tbfs, int *n_tbfs) {
+  
+  if (tbk_fname_list == NULL) return;
+  
+  gzFile fh = wzopen(tbk_fname_list);
+  if (!fh) { wzfatal("Cannot read tbk file name list."); }
+  char *line = NULL; char **fields; int nfields; char *sname;
+  while(gzFile_read_line(fh, &line)) {
+    line_get_fields(line, "\t", &fields, &nfields);
+    if (nfields > 0) {
+      (*tbfs) = realloc((*tbfs), (++(*n_tbfs)) * sizeof(tbf_t));
+      if (nfields > 1) sname = fields[1]; else sname = NULL;
+      tbf_open1(fields[0], &(*tbfs)[*n_tbfs-1], sname);
+    }
+    free_fields(fields, nfields);
+  }
+  free(line);
+}
+
+void parse_tbk_from_tbf(tbf_t *tbf, tbk_t **tbks, int *n_tbks) {
+  tbk_t *tbk;
+  int n = 0;
+  while (1) {
+    (*tbks) = realloc((*tbks), (++(*n_tbks))*sizeof(tbk_t));
+    tbk = &(*tbks)[(*n_tbks)-1];
+    tbf_next(tbf, tbk);
+    n++;
+    if (tbf->sname_first != NULL) tbk->sname = strdup(tbf->sname_first);
+    if (tbk->version < 100) break;
+    tbf_skip_data(tbk);
+  }
+
+  if (n==1 && tbk->sname == NULL) {
+    tbk_set_sname_by_fname(&(*tbks)[(*n_tbks)-1]);
+  }
+}
+
+static void infer_idx(tbk_t *tbks, int n_tbks, char **idx_fname) {
+
+  if (*idx_fname != NULL) return;
+  
+  /* look at the message box for idx_fname */
+  int i;
+  for(i=0; i<min(n_tbks, 500); ++i) {
+    char *res = clean_path(tbks[i].extra, tbks[i].tbf->fname);
+    if (res) {
+      DIR *d = opendir(res);
+      if (d) {               /* exclude the possibility that it's a folder */
+        closedir(d);
+      } else {
+        /* FILE *fp = fopen(res,"r"); */
+        htsFile *fp = hts_open(res,"r");
+        if(fp) {
+          *idx_fname = res;
+          hts_close(fp);
+          break;
+        }
+      }
+    }
+  }
+
+  /* Last resort:
+     look at the parent folder for the first tbk file idx.gz */
+  if (*idx_fname == NULL) {
+    char *tmp = strdup(tbks[0].tbf->fname); /* search first tbk */
+    char *dir = dirname(tmp);
+    *idx_fname = calloc(strlen(dir) + 10, sizeof(char));
+    strcpy(*idx_fname, dir);
+    strcat(*idx_fname, "/idx.gz");
+    free(tmp);
+  }
 }
 
 int main_view(int argc, char *argv[]) {
@@ -449,120 +507,29 @@ int main_view(int argc, char *argv[]) {
   int nregs = 0;
   char **regs = NULL;
 
-  int n_tbks = 0; // = argc - optind;
-  tbk_t *tbks = NULL; // calloc(n_tbks, sizeof(tbk_t));
+  int n_tbks = 0; tbk_t *tbks = NULL;
+  int n_tbfs = 0; tbf_t *tbfs = NULL;
+  parse_tbf_from_argument(argc, argv, optind, &tbfs, &n_tbfs);
+  parse_tbf_fname_list(tbk_fname_list, &tbfs, &n_tbfs);
   int i;
-  struct dirent *dir;
-  for(i=0; optind < argc; optind++, i++) {
-    /* if it's a directory then list all the .tbk files underneath */
-    DIR* d = opendir(argv[optind]);
-    if (d) { /* Directory exists. */
-      while ((dir = readdir(d)) != NULL) {
-        if (strlen(dir->d_name) > 4 && strcmp(dir->d_name + strlen(dir->d_name) - 4, ".tbk")==0) {
-          tbks = realloc(tbks, (n_tbks+1)*sizeof(tbk_t));
-          tbks[n_tbks].fname = malloc(strlen(argv[optind]) + strlen(dir->d_name) + 5);
-          strcpy(tbks[n_tbks].fname, argv[optind]);
-          strcat(tbks[n_tbks].fname, "/");
-          strcat(tbks[n_tbks].fname, dir->d_name);
-          tbk_set_sname_by_fname(&tbks[n_tbks]);
-          n_tbks++;
-        }
-      }
-      closedir(d);
-    } else {
-      tbks = realloc(tbks, (n_tbks+1)*sizeof(tbk_t));
-      tbks[n_tbks].fname = strdup(argv[optind]);
-      tbk_set_sname_by_fname(&tbks[n_tbks]);
-      n_tbks++;
-    }
+  for (i=0; i<n_tbfs; ++i) {
+    parse_tbk_from_tbf(&tbfs[i], &tbks, &n_tbks);
   }
-
-  if (tbk_fname_list) {
-    gzFile fh = wzopen(tbk_fname_list);
-    if (!fh) { wzfatal("Cannot read tbk file name list."); }
-    char *line = NULL; char **fields; int nfields;
-    while(gzFile_read_line(fh, &line)) {
-      line_get_fields(line, "\t", &fields, &nfields);
-      if (nfields > 0) {
-        tbks = realloc(tbks, (n_tbks+1)*sizeof(tbk_t));
-        tbks[n_tbks].fname = strdup(fields[0]);
-        if (nfields > 1) {
-          tbks[n_tbks].sname = strdup(fields[1]);
-        } else {
-          tbk_set_sname_by_fname(&tbks[n_tbks]);
-        }
-        n_tbks++;
-      }
-      free_fields(fields, nfields);
-    }
-    free(line);
-  }
-
-  /* look at the message box */
-  if (!idx_fname) {
-    /* try read the header names */
-    for(i=0; i<n_tbks; ++i) {
-      tbk_open(&tbks[i]);
-
-      /* get real path */
-      char buf[PATH_MAX];
-
-      wordexp_t result;
-      wordexp(tbks[i].extra, &result, 0);
-      strcpy(tbks[i].extra, result.we_wordv[0]);
-      wordfree(&result);
-      
-      if (tbks[i].extra[0] == '/') {
-        strcpy(buf, tbks[i].extra);
-      } else {
-        char *tmp = strdup(tbks[i].fname);
-        strcpy(buf, dirname(tmp));
-        free(tmp);
-        strcat(buf, "/");
-        strcat(buf, tbks[i].extra);
-      }
-
-      char *res = realpath(buf, NULL);
-      if (res) {
-        DIR *d = opendir(res);
-        if (d) {               /* exclude the possibility that it's a folder */
-          closedir(d);
-        } else {
-          /* FILE *fp = fopen(res,"r"); */
-          htsFile *fp = hts_open(res,"r");
-          if(fp) {
-            idx_fname = res;
-            tbk_close(&tbks[i]);
-            hts_close(fp);
-            break;
-          }
-        }
-      }
-      tbk_close(&tbks[i]);
-    }
-  }
-
-  /* look at the first tbk folder idx.gz */
-  if (!idx_fname) {
-    char *tmp = strdup(tbks[0].fname); /* search first tbk */
-    char *dir = dirname(tmp);
-    idx_fname = calloc(strlen(dir) + 10, sizeof(char));
-    strcpy(idx_fname, dir);
-    strcat(idx_fname, "/idx.gz");
-    free(tmp);
-  }
-
+  
+  infer_idx(tbks, n_tbks, &idx_fname);
+  
   regs = parse_regions(regions_fname, region, &nregs);
   int ret;
   if (conf.chunk_read)
     ret = chunk_query_region(idx_fname, regs, nregs, tbks, n_tbks, &conf, out_fh);
   else
     ret = query_regions(idx_fname, regs, nregs, tbks, n_tbks, &conf, out_fh);
-  
-  if (n_tbks > 0) {for (i=0; i<n_tbks; ++i) free(tbks[i].fname);}
-  free(tbks);
+
+  if (n_tbfs > 0) {for (i=0; i<n_tbfs; ++i) tbf_close(&tbfs[i]); free(tbfs);}
+  if (n_tbks > 0) {for (i=0; i<n_tbks; ++i) free(tbks[i].sname); free(tbks);}
   if (idx_fname) free(idx_fname);
   free(conf.na_token);
+  if (region) free(region);
   return ret;
 }
 

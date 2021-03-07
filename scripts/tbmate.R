@@ -248,6 +248,7 @@ tbk_data0 <- function(tbk_fnames, idx_addr, all_units = FALSE, max_addr = 3000, 
     if (tbk_hdrs(tbk_fnames[1])[[1]]$num < max_source && length(idx_addr) < max_addr) {
         tbk_data_addr(tbk_fnames, idx_addr, all_units = all_units, config = config)
     } else {
+        warning("Too many probes, will use bulk load. Adjust max_addr to override.")
         tbk_data_bulk(tbk_fnames, idx_addr, all_units = all_units, config = config)
     }
 }

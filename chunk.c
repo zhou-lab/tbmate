@@ -124,10 +124,10 @@ void tbk_print1(tbk_data_t *d, int i, view_conf_t *conf, kstring_t *ks) {
   }
 }
 
-void tbk_query_n(tbk_t *tbk, int64_t offset, int n, tbk_data_t *data) {
-  if (offset >= tbk->offset_max) {wzfatal("Error: query %d out of range. Wrong idx file?", offset);}
-  if (offset + n >= tbk->offset_max) {
-    n = tbk->offset_max - offset;
+void tbk_query_n(tbk_t *tbk, int64_t chunk_beg, int n, tbk_data_t *data) {
+  if (chunk_beg >= tbk->nmax) {wzfatal("Error: query %d out of range. Wrong idx file?", chunk_beg);}
+  if (chunk_beg + n >= tbk->nmax) {
+    n = tbk->nmax - chunk_beg;
   }
   if (n <= 0) return;
   
@@ -135,138 +135,100 @@ void tbk_query_n(tbk_t *tbk, int64_t offset, int n, tbk_data_t *data) {
   data->dtype = tbk->dtype;
 
   switch(DATA_TYPE(tbk->dtype)) {
-  case DT_INT1: {
-    tbk->offset = offset/8;                           /* always seek */
-    if(fseek(tbk->fh, offset/8+HDR_TOTALBYTES, SEEK_SET)) wzfatal("File %s cannot be seeked.\n", tbk->fname);
+  /* case DT_INT1: { */
+  /*   tbk->offset = offset/8;                           /\* always seek *\/ */
+  /*   if(fseek(tbk->fh, offset/8+HDR_TOTALBYTES, SEEK_SET)) wzfatal("File %s cannot be seeked.\n", tbk->fname); */
     
-    int nb = (offset + n) / 8 - offset / 8 + 1;
-    uint8_t *tmp = calloc(nb, 1);
-    fread(tmp, 1, nb, tbk->fh); tbk->offset += n;
-    data->data = realloc(data->data, n);
-    int i;
-    for (i=0; i<n; ++i) {
-      ((uint8_t*)data->data)[i] = (tmp[(offset+i)/8 - offset/8] >> (offset+i)%8) & 0x1;
-    }
-    break;
-  }
-  case DT_INT2: {
-    tbk->offset = offset/4;                           /* always seek */
-    if(fseek(tbk->fh, offset/4+HDR_TOTALBYTES, SEEK_SET)) wzfatal("File %s cannot be seeked.\n", tbk->fname);
+  /*   int nb = (offset + n) / 8 - offset / 8 + 1; */
+  /*   uint8_t *tmp = calloc(nb, 1); */
+  /*   fread(tmp, 1, nb, tbk->fh); tbk->offset += n; */
+  /*   data->data = realloc(data->data, n); */
+  /*   int i; */
+  /*   for (i=0; i<n; ++i) { */
+  /*     ((uint8_t*)data->data)[i] = (tmp[(offset+i)/8 - offset/8] >> (offset+i)%8) & 0x1; */
+  /*   } */
+  /*   break; */
+  /* } */
+  /* case DT_INT2: { */
+  /*   tbk->offset = offset/4;                           /\* always seek *\/ */
+  /*   if(fseek(tbk->fh, offset/4+HDR_TOTALBYTES, SEEK_SET)) wzfatal("File %s cannot be seeked.\n", tbk->fname); */
     
-    int nb = (offset + n) / 4 - offset / 4;
-    uint8_t *tmp = calloc(nb, 1);
-    fread(tmp, 1, nb, tbk->fh); tbk->offset += n;
-    data->data = realloc(data->data, n);
-    int i;
-    for (i=0; i<n; ++i) {
-      ((uint8_t*)data->data)[i] = (tmp[(offset+i)/4 - offset/4] >> (((offset+i)%4)*2)) & 0x3;
-    }
-    break;
-  }
+  /*   int nb = (offset + n) / 4 - offset / 4; */
+  /*   uint8_t *tmp = calloc(nb, 1); */
+  /*   fread(tmp, 1, nb, tbk->fh); tbk->offset += n; */
+  /*   data->data = realloc(data->data, n); */
+  /*   int i; */
+  /*   for (i=0; i<n; ++i) { */
+  /*     ((uint8_t*)data->data)[i] = (tmp[(offset+i)/4 - offset/4] >> (((offset+i)%4)*2)) & 0x3; */
+  /*   } */
+  /*   break; */
+  /* } */
   case DT_INT32: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*4+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-    
+    tbk_seek_n(tbk, chunk_beg);
     data->data = realloc(data->data, 4*n);
-    fread(data->data, 4, n, tbk->fh); tbk->offset += n;
+    tbf_read(tbk->tbf, data->data, 4, n);
     break;
   }
   case DT_FLOAT: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*4+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-
+    tbk_seek_n(tbk, chunk_beg);
     data->data = realloc(data->data, 4*n);
-    fread(data->data, 4, n, tbk->fh); tbk->offset += n;
+    tbf_read(tbk->tbf, data->data, 4, n);
     break;
   }
   case DT_DOUBLE: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
+    tbk_seek_n(tbk, chunk_beg);
     data->data = realloc(data->data, 8*n);
-    fread(data->data, 8, n, tbk->fh); tbk->offset += n;
+    tbf_read(tbk->tbf, data->data, 8, n);
     break;
   }
   case DT_STRINGF: {
     int smax = STRING_MAX(tbk->dtype);
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*n+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
+    tbk_seek_n(tbk, chunk_beg);
     data->data = realloc(data->data, n*smax);
-    fread(data->data, 1, n*smax, tbk->fh); tbk->offset += n;
+    tbf_read(tbk->tbf, data->data, 1, n*smax);
     break;
   }
   case DT_STRINGD: {
-    if (offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
+    tbk_seek_n(tbk, chunk_beg);
 
     data->data = realloc(data->data, sizeof(char*)*n);
     uint64_t *string_offsets = malloc(sizeof(uint64_t)*n);
-    fread(string_offsets, 8, n, tbk->fh); tbk->offset += n;
+    tbf_read(tbk->tbf, string_offsets, 8, n);
 
     int i;
     for (i=0; i<n; ++i) {
-      fseek(tbk->fh, string_offsets[i]+tbk->offset_max*8+HDR_TOTALBYTES, SEEK_SET);
+      tbk_seek_offset(tbk, string_offsets[i]+tbk->nmax*8);
       kstring_t ks = {0}; char c;
       while (1) {
-        fread(&c, 1,1,tbk->fh);
+        tbf_read(tbk->tbf, &c, 1, 1);
         if (c) kputc(c, &ks);
         else break;
       }
       ((char**) data->data)[i] = ks.s;
     }
-    tbk->offset = -1; // need to be reset
     free(string_offsets);
     break;
   }
   case DT_ONES: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*2+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-    data->data = realloc(data->data, 4*n);
-
+    tbk_seek_n(tbk, chunk_beg);
+    data->data = realloc(data->data, 2*n);
     uint16_t *tmp = calloc(n, 2);
-    fread(tmp, 2, n, tbk->fh); tbk->offset += n;
+    tbf_read(tbk->tbf, tmp, 2, n);
     int ii;
     for (ii=0; ii<n; ++ii) ((float*)data->data)[ii] = uint16_to_float(tmp[ii]);
     free(tmp);
     break;
   }
   case DT_FLOAT_INT: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-
+    tbk_seek_n(tbk, chunk_beg);
     data->data = realloc(data->data, 8*n);
-    fread(data->data, 8, n, tbk->fh); tbk->offset += n;
+    tbf_read(tbk->tbf, data->data, 8, n);
     break;
   }
   case DT_FLOAT_FLOAT: {
-    if(offset != tbk->offset) {
-      if(fseek(tbk->fh, offset*8+HDR_TOTALBYTES, SEEK_SET))
-        wzfatal("File %s cannot be seeked.\n", tbk->fname);
-      tbk->offset = offset;
-    }
-
+    tbk_seek_n(tbk, chunk_beg);
     data->data = realloc(data->data, 8*n);
-    fread(data->data, 8, n, tbk->fh); tbk->offset += n;
+    tbf_read(tbk->tbf, data->data, 8, n);
     break;
   }
   default: wzfatal("Unrecognized data type: %d.\n", DATA_TYPE(tbk->dtype));
@@ -282,8 +244,8 @@ static void query_one_chunk(int *offsets, int n_offsets, tbk_t *tbks, int n_tbks
   tbk_data_t data = {0};
   for(k=0; k<n_tbks; ++k) {     /* iterate through samples */
     int chunk_beg = 0;
-    for (chunk_beg = 0; chunk_beg < tbks[k].offset_max; chunk_beg += conf->n_chunk_data) { /* iterate data chunk */
-      int chunk_end = (chunk_beg + conf->n_chunk_data > tbks[k].offset_max) ? tbks[k].offset_max : (chunk_beg + conf->n_chunk_data);
+    for (chunk_beg = 0; chunk_beg < tbks[k].nmax; chunk_beg += conf->n_chunk_data) { /* iterate data chunk */
+      int chunk_end = (chunk_beg + conf->n_chunk_data > tbks[k].nmax) ? tbks[k].nmax : (chunk_beg + conf->n_chunk_data);
       tbk_query_n(&tbks[k], chunk_beg, conf->n_chunk_data, &data);
       if (chunk_end - chunk_beg != data.n) {
         wzfatal("Unequal number of records read %d, expecting %d\n", data.n, chunk_end-chunk_beg);
@@ -322,9 +284,6 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
   htsFile *fp = hts_open(fname,"r");
   if(!fp) error("Could not read %s\n", fname);
   
-  int k;
-  for(k=0; k<n_tbks; ++k) tbk_open(&tbks[k]);
-
   tbx_t *tbx = tbx_index_load(fname);
   if(!tbx) error("Could not load .tbi/.csi index of %s\n", fname);
   kstring_t str = {0,0,0};
@@ -335,14 +294,14 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
   int nfields = -1;
   char *aux = NULL;
   
-  int offset, ii;
+  int n, ii;
   int linenum=0;
 
   int index_chunk_beg = 0;
   int index_chunk_end = 1;
 
   /* offsets in the current chunk */
-  int *offsets = calloc(conf->n_chunk_index, sizeof(int));
+  int *ns = calloc(conf->n_chunk_index, sizeof(int));
   /* output */
   kstring_t *ks_out = calloc(conf->n_chunk_index, sizeof(kstring_t));
   
@@ -361,9 +320,9 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
       }
       
       ensure_number2(fields[3]);
-      offset = atoi(fields[3]);
+      n = atoi(fields[3]);
 
-      if (offset >= 0 || conf->show_unaddressed) {
+      if (n >= 0 || conf->show_unaddressed) {
         kstring_t *ks = &ks_out[index_chunk_end - index_chunk_beg - 1];
         kputs(fields[0], ks); kputc('\t', ks);
         kputs(fields[1], ks); kputc('\t', ks);
@@ -372,10 +331,10 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
           for (ii=3; ii<nfields; ++ii)
             ksprintf(ks, "\t%s", fields[ii]);
         }
-        offsets[index_chunk_end - index_chunk_beg - 1] = offset;
+        ns[index_chunk_end - index_chunk_beg - 1] = n;
       
         if (index_chunk_end % conf->n_chunk_index == 0) {
-          query_one_chunk(offsets, index_chunk_end-index_chunk_beg, tbks, n_tbks, conf, ks_out, out_fh);
+          query_one_chunk(ns, index_chunk_end-index_chunk_beg, tbks, n_tbks, conf, ks_out, out_fh);
           index_chunk_beg = index_chunk_end;
         }
                 
@@ -387,18 +346,16 @@ int chunk_query_region(char *fname, char **regs, int nregs, tbk_t *tbks, int n_t
     tbx_itr_destroy(itr);
   }
 
-  query_one_chunk(offsets, index_chunk_end-index_chunk_beg-1, tbks, n_tbks, conf, ks_out, out_fh);
+  query_one_chunk(ns, index_chunk_end-index_chunk_beg-1, tbks, n_tbks, conf, ks_out, out_fh);
 
   free_fields(fields, nfields);
   free(aux);
-  free(offsets);
+  free(ns);
   free(seq);
   free(str.s);
   tbx_destroy(tbx);
 
   if(hts_close(fp)) error("hts_close returned non-zero status: %s\n", fname);
-  
-  for(k=0; k<n_tbks; ++k) tbk_close(&tbks[k]);
   
   for(i=0; i<nregs; i++) free(regs[i]);
   free(regs);

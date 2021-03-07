@@ -100,7 +100,11 @@ static int data_type(beddata_t *samples, int n_samples) {
   return -1;
 }
 
-void tbk_write(beddata_t *bd, uint64_t dtype, FILE *out, int n, uint8_t *aux, FILE *tmp_out, uint64_t *tmp_out_offset, conf_pack_t *conf) {
+void tbk_write(
+  beddata_t *bd, uint64_t dtype, FILE *out,
+  int n, uint8_t *aux,
+  FILE *tmp_out, uint64_t *tmp_out_offset,
+  conf_pack_t *conf) {
 
   char *s = bd->s[0];
   switch(DATA_TYPE(dtype)) {
@@ -316,8 +320,8 @@ int main_pack(int argc, char *argv[]) {
   }
 
   /* the actual size */
-  fseek(tbk_out, HDR_MAX_OFFSET0, SEEK_SET);
-  fwrite(&n,     HDR_MAX_OFFSET, 1, tbk_out);
+  fseek(tbk_out, HDR_NMAX0, SEEK_SET);
+  fwrite(&n,     HDR_NMAX, 1, tbk_out);
 
   if (tmp_out) {
     fclose(tmp_out);

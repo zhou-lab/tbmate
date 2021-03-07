@@ -52,7 +52,10 @@ chunk.o: chunk.c
 header.o: header.c
 	$(CC) -c $(CFLAGS) -I$(LUTILS_DIR) -I$(LHTSLIB_INCLUDE) $< -o $@
 
-LIBS=view.o chunk.o pack.o header.o $(LHTSLIB)
+bundle.o: bundle.c
+	$(CC) -c $(CFLAGS) -I$(LUTILS_DIR) -I$(LHTSLIB_INCLUDE) $< -o $@
+
+LIBS=view.o chunk.o pack.o header.o bundle.o $(LHTSLIB)
 
 tbmate: $(LIBS) main.c
 	gcc $(CFLAGS) main.c -o $@ $(LIBS) $(CLIB)
