@@ -57,6 +57,8 @@ int main_bundle(int argc, char *argv[]) {
   tbk_t tbk = {0};
   for(; optind < argc; optind++) {
     tbf_open1(argv[optind], &tbf, NULL);
+    fprintf(stderr, "Adding %s\n", argv[optind]);
+    fflush(stderr);
     while (1) {
       tbf_next(&tbf, &tbk);
 
@@ -81,6 +83,7 @@ int main_bundle(int argc, char *argv[]) {
       }
       tbk_close(&tbk);
       free(tbk.sname);
+      tbf_close(&tbf);
       
       if (tbk.version < 100) break;
     }

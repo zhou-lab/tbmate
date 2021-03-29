@@ -268,8 +268,8 @@ void tbk_write(beddata_t *bd, uint64_t dtype, FILE *out, int n, uint8_t *aux,
                FILE*tmp_out, uint64_t *tmp_out_offset, conf_pack_t *conf);
 
 
+/* doesn't close tbf, need to close separately */
 static inline void tbk_close(tbk_t *tbk) {
-  tbf_close(tbk->tbf);
   char *sname = tbk->sname;
   /* reset everything except fname and sname */
   memset(tbk, 0, sizeof(tbk_t));
