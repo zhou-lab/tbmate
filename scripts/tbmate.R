@@ -434,6 +434,7 @@ tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype
             stop("Please provide out_fname.\n")
         } else {
             out_dir = dirname(out_fname);
+            out_fname = basename(out_fname);
         }
     }
     if (!dir.exists(out_dir)) dir.create(out_dir);
