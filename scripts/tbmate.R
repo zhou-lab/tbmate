@@ -18,12 +18,12 @@ HDR_EXTRA      <- 8169
 HDR_TOTALBYTES <- 8192
 
 tbk_hdr <- function(tbk_file) {
-    id <- rawToChar(readBin(tbk_file, raw(), 3, 1))
+    id <- rawToChar(readBin(tbk_file, "raw", 3, 1))
     stopifnot(id == "tbk")
-    tbk_version <- readBin(tbk_file, integer(), 1, 4)
-    dtype <- readBin(tbk_file, integer(), 1, 8)
-    num <- readBin(tbk_file, integer(), 1, 8)
-    msg0 = rawToChar(readBin(tbk_file, raw(), HDR_EXTRA, 1), multiple=TRUE)
+    tbk_version <- readBin(tbk_file, "integer", 1, 4)
+    dtype <- readBin(tbk_file, "integer", 1, 8)
+    num <- readBin(tbk_file, "integer", 1, 8)
+    msg0 = rawToChar(readBin(tbk_file, "raw", HDR_EXTRA, 1), multiple=TRUE)
     msg <- paste0(msg0[1:(min(which(msg0==""))-1)], collapse='')
     out <- structure(list(
         tbk_version = tbk_version,
@@ -78,6 +78,9 @@ tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE, config = c
         'INT1' = read_unit_default, # FIXME
         'INT2' = read_unit_default, # FIXME
         'ONES' = read_unit_default, # FIXME
+        "STRINGF" = function() {
+            cbind(sigs = sapply(seq_len(hdr$num), function(i) rawToChar(readBin(in_file, "raw", hdr$smax, 1), multiple=FALSE)))
+        },
         'FLOAT_FLOAT' = function() {
             d0 <- readBin(in_file, "raw", hdr$num*8, 1)
             d1 <- readBin(d0[bitwAnd(bitwShiftR(seq_along(d0)+3,2),1) == 1], 'numeric', hdr$num, 4)
@@ -368,7 +371,7 @@ tbk_data <- function(
 }
 
 ## write tbk for one sample
-tbk_write_unit <- function(out_file, d1, d2, dtype, nchar_max) {
+tbk_write_unit <- function(out_file, d1, d2, dtype, smax) {
 
     if (dtype == "INT1") {
         d0 <- 0
@@ -397,7 +400,7 @@ tbk_write_unit <- function(out_file, d1, d2, dtype, nchar_max) {
     } else if (dtype == "STRINGF") {
         tmp = lapply(seq_along(d1), function(i) {
             writeBin(c(charToRaw(d1[i]),
-                rep(as.raw(0),length.out=nchar_max-nchar(d1[i]))), out_file)
+                rep(as.raw(0),length.out=smax-nchar(d1[i]))), out_file)
         })
     } else if (dtype == "STRINGD") {
         stop("String packing not supported in R yet. Please use the command line.")
@@ -513,11 +516,11 @@ tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype
         if (nchar(msg) == 0) msg <- idx_fname
         tbk_hdr_write(out_file, d1, dtype = dtype, msg = msg, tbk_version = tbk_version)
         if (dtype == "STRINGF") {
-            nchar_max = max(sapply(d1, nchar))
+            smax = max(sapply(d1, nchar))
         } else {
-            nchar_max = NULL
+            smax = NULL
         }
-        tbk_write_unit(out_file, d1, d2, dtype, nchar_max)
+        tbk_write_unit(out_file, d1, d2, dtype, smax)
     })
 }
 
