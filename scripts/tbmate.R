@@ -367,8 +367,8 @@ tbk_data <- function(
     data
 }
 
-
-tbk_write_unit <- function(out_file, d1, d2, dtype) {
+## write tbk for one sample
+tbk_write_unit <- function(out_file, d1, d2, dtype, nchar_max) {
 
     if (dtype == "INT1") {
         d0 <- 0
@@ -395,7 +395,10 @@ tbk_write_unit <- function(out_file, d1, d2, dtype) {
     } else if (dtype == 'DOUBLE') {
         writeBin(d1, out_file, 8)
     } else if (dtype == "STRINGF") {
-        stop("String packing not supported in R yet. Please use the command line.")
+        tmp = lapply(seq_along(d1), function(i) {
+            writeBin(c(charToRaw(d1[i]),
+                rep(as.raw(0),length.out=nchar_max-nchar(d1[i]))), out_file)
+        })
     } else if (dtype == "STRINGD") {
         stop("String packing not supported in R yet. Please use the command line.")
     }  else if (dtype == "ONES") {
@@ -415,6 +418,19 @@ tbk_write_unit <- function(out_file, d1, d2, dtype) {
     }
 }
 
+naToken = function(dclass, na.token) {
+    if (is.null(na.token)) {
+        if (dclass == "character") {
+            "NA"
+        } else if (dclass == "numeric") {
+            -1.0
+        }
+    } else {
+        na.token
+    }
+}
+
+
 #' Pack data to tbk
 #'
 #' @param data
@@ -426,7 +442,7 @@ tbk_write_unit <- function(out_file, d1, d2, dtype) {
 #' @param idx_fname index file name
 #' @param link_idx whether or not a link is generated to the index
 #' @export
-tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_fname = NULL, tbk_version = 1, msg="", na.token = -1.0, link_idx = FALSE) {
+tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype="FLOAT", idx_fname = NULL, tbk_version = 1, msg="", na.token = NULL, link_idx = FALSE) {
 
     ## output dir
     if (is.null(out_dir)) {
@@ -447,7 +463,8 @@ tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype
         } else {
             stop("Please provide idx_fname.\n")
         }
-    } else if (link_idx && !file.exists(file.path(out_dir, 'idx.gz'))) { # set up idx.gz if nonexistent
+    } else if (link_idx && !file.exists(file.path(out_dir, 'idx.gz'))) {
+                                        # set up idx.gz if nonexistent
         file.symlink(
             tools::file_path_as_absolute(idx_fname),
             file.path(out_dir, 'idx.gz'))
@@ -474,14 +491,14 @@ tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype
 
     tmp <- lapply(seq_len(ncol(data)), function(k) {
         fname <- colnames(data)[k]
-        idx <- match(names(idx_addr), rownames(data))
-        d1 <- ifelse(is.na(idx), na.token, data[idx,k])
-        d1[is.na(d1)] <- na.token
+        idx = match(names(idx_addr), rownames(data))
+        d1 = ifelse(is.na(idx), naToken(class(data[,k]), na.token), data[idx,k])
+        d1[is.na(d1)] = naToken(class(data[,k]), na.token)
         if (is.null(data2)) {
             d2 <- NULL
         } else {
-            d2 <- ifelse(is.na(idx), na.token, data2[idx,k])
-            d2[is.na(d2)] <- na.token
+            d2 <- ifelse(is.na(idx), naToken(class(data2[,k]), na.token), data2[idx,k])
+            d2[is.na(d2)] <- naToken(class(data2[,k]), na.token)
         }
 
         out_fname1 <- file.path(out_dir, fname)
@@ -495,7 +512,12 @@ tbk_pack <- function(data, data2 = NULL, out_dir = NULL, out_fname = NULL, dtype
         }
         if (nchar(msg) == 0) msg <- idx_fname
         tbk_hdr_write(out_file, d1, dtype = dtype, msg = msg, tbk_version = tbk_version)
-        tbk_write_unit(out_file, d1, d2, dtype)
+        if (dtype == "STRINGF") {
+            nchar_max = max(sapply(d1, nchar))
+        } else {
+            nchar_max = NULL
+        }
+        tbk_write_unit(out_file, d1, d2, dtype, nchar_max)
     })
 }
 

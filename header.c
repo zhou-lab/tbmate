@@ -51,7 +51,7 @@ int main_header(int argc, char *argv[]) {
 
       tbf = tbf_open(argv[optind]);
       fprintf(stdout, "\nTBK File: %s\n", tbf->fname);
-      fprintf(stderr, "Number of sampels: %d\n", tbf_num_samples(argv[optind]));
+      fprintf(stderr, "Number of samples: %d\n", tbf_num_samples(argv[optind]));
 
       j = 1;
       while (1) {

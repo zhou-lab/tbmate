@@ -81,7 +81,7 @@ static inline uint16_t float_to_uint16(float f) {
 extern const int unit_base[40];
 static inline int unit_size(uint64_t d) {
   int nu = unit_base[DATA_TYPE(d)];
-  if (d == DT_STRINGF) {
+  if (DATA_TYPE(d) == DT_STRINGF) {
     nu += STRING_MAX(d);
   }
   return nu;
