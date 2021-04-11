@@ -113,7 +113,7 @@ tbk_read_chunk <- function(in_file, hdr, idx_addr, all_units = FALSE, config = c
 }
 
 tbk_data_bulk <- function(tbk_fnames, idx_addr, all_units = FALSE, config = config) {
-    idx_addr <- sort(idx_addr)
+    idx_addr <- sort(idx_addr) # sorts the index, this disrupts the order of output!!
     data <- lapply(tbk_fnames, function(tbk_fname) {
         in_file <- file(tbk_fname,'rb')
         on.exit(close(in_file))
@@ -290,17 +290,18 @@ infer_idx <- function(tbk_fname) {
 #' @param min_coverage minimum sig2 for float.int
 #' @param name.use.base use basename for sample name
 #' @param negative.as.na NA-mask negative value
+#' @param char.na when loading character array, treat "NA" as NA
 #' @param max_addr random addressing if under max_addr
 #' @param min_source random addressing if source size is under min_source
 #' @return numeric matrix
 #' @export
 tbk_data <- function(
     tbk_fnames, idx_fname = NULL, probes = NULL, show.unaddressed = FALSE,
-    chrm = NULL, beg = NULL, end = NULL, as.matrix = FALSE, negative.as.na = TRUE,
-    simplify = FALSE, name.use.base=TRUE, max_addr = 3000, max_source = 10^6,
+    chrm = NULL, beg = NULL, end = NULL, as.matrix = FALSE, negative.as.na = TRUE, char.na = TRUE,
+    simplify = TRUE, name.use.base=TRUE, max_addr = 3000, max_source = 10^6,
     max_pval = 0.05, min_coverage = 5, all_units = FALSE) {
 
-    library(Rsamtools)
+    suppressMessages(library(Rsamtools))
 
     ## given a folder
     if (length(tbk_fnames) == 1 && dir.exists(tbk_fnames[1])) {
@@ -337,7 +338,9 @@ tbk_data <- function(
 
     config <- list(max_pval = max_pval, min_coverage = min_coverage)
 
-    data <- tbk_data0(tbk_fnames, idx_addr, max_addr=max_addr, max_source=max_source, all_units=all_units, config = config)
+    data <- tbk_data0(
+        tbk_fnames, idx_addr, max_addr=max_addr,
+        max_source=max_source, all_units=all_units, config = config)
 
     ## add column names
     if (name.use.base) {
@@ -356,6 +359,15 @@ tbk_data <- function(
     if (negative.as.na) {
         data[data < 0] <- NA
     }
+    if (char.na && class(data[1]) == "character") {
+        data[data == "NA"] = NA
+    }
+
+    data = data[names(idx_addr),] # restore by the order of the input
+    if (simplify && ncol(data) == 1) {
+        data = data[,1]
+    }
+    
     ## if (!is.null(chrm)) {
     ##     if (as.matrix && ncol(df)>=5) {
     ##         rownames(data) <- df[rownames(data),5]
