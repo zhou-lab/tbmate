@@ -364,7 +364,7 @@ tbk_data <- function(
     }
 
     data = data[names(idx_addr),] # restore by the order of the input
-    if (simplify && ncol(data) == 1) {
+    if (!is.null(dim(data)) && simplify && ncol(data) == 1) {
         data = data[,1]
     }
     
