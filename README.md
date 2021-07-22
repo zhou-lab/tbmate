@@ -68,16 +68,18 @@ Python API is under [pytbmate](https://github.com/zhou-lab/tbmate/pytbmate)
 
 A test dataset can be downloaded from [here](https://www.dropbox.com/)
 ```
-wget https://dropbox****/Test.tar.gz
-tar zxvf Test.tar.gz
+wget https://dropbox****/test.tar.gz
+tar zxvf test.tar.gz
 ```
 
-**1. Building tabix index.**
+### **1. Building tabix index.**
 
 For example, downloading HM450 array manifest file and index it with tabix
 ```
 wget ftp://webdata2:webdata2@ussd-ftp.illumina.com/downloads/ProductFiles/HumanMethylation450/HumanMethylation450_15017482_v1-2.csv
 ```
+This step can be skipped, HumanMethylation450_15017482_v1-2.csv has been downloaded and put under test/HM450
+
 Prepare tabix index file
 ```
 sed '1,8d' HumanMethylation450_15017482_v1-2.csv |cut -f 1 -d ","|grep -E "^cg|^ch|^rs" | sort -k1V |awk 'BEGIN {OFS="\t";} {print $0,1,2,NR-1}' | bgzip > hm450_idx.bed.gz
@@ -151,7 +153,7 @@ chr1    69590   69592   699401  cg21870274
 Note most entries have -1 which indicate no Infinium EPIC array ID is spotted. `tbmate view -d` can optionally omit these in the display. All index files can be easily generated from the native address file.
 
 
-### Pack into .tbk files
+### **2. Pack into .tbk files**
 
 ```
 tbmate pack -s float input.bed output.tbk
@@ -176,7 +178,7 @@ For example:</br>
 
 - Packing HM450 array data into .tbk.
 ```
-cd Test/HM450/
+cd test/HM450/
 tbmate pack -s float -m "hm450_idx.bed.gz" example.bed.gz out.tbk  #Packing the 4th column into out.tbk
 # Or using tbmate after pipe to pack the 5th column into tbk file.
 zcat example.bed.gz | cut -f 1,2,3,5 |tbmate pack -m "hm450_idx.bed.gz" - GSM3417546.tbk
@@ -185,7 +187,7 @@ Please Note: the coordinate of example.bed.gz has been processed to be the same 
 
 - Packing WGBS data into .tbk.
 ```
-cd Test/WGBS/
+cd test/WGBS/
 tbmate pack -s float -m "idx.gz" TCGA_BLCA_A13J_cpg.gz TCGA_BLCA_A13J.tbk
 ls TCGA_BLCA_A13J* -sh
 ```
@@ -193,7 +195,7 @@ ls TCGA_BLCA_A13J* -sh
 256M TCGA_BLCA_A13J_cpg.gz  127M TCGA_BLCA_A13J.tbk
 ```
 
-### View .tbk files
+### **3. View .tbk files**
 
 ```
 tbmate view input.tbk [more_input.tbk [...]]
@@ -220,7 +222,7 @@ Options:
 
 ```
 # view header
-cd Test/WGBS/
+cd test/WGBS/
 tbmate header TCGA_BLCA_A13J.tbk
 
 # view the whole dataset
@@ -235,7 +237,7 @@ tbmate header -m "hg38_to_EPIC.idx.gz" TCGA_BLCA_A13J.tbk
 # confirm it's changed
 tbmate header TCGA_BLCA_A13J.tbk   # See "Message: hg38_to_EPIC.idx.gz"
 
-# now using the new coordinates to query by EPIC probe ID.
+# now we can use the new coordinates to query by EPIC probe ID.
 tbmate view -cd -g cg00013374,cg00012123,cg00006867 TCGA_BLCA_A13J.tbk
 
 # switch back without modify the header
@@ -244,13 +246,17 @@ tbmate view -cd -i "idx.gz" -g chr19:246460-346460 TCGA_BLCA_A13J.tbk | less
 
 View or query from multiple .tbk files simultaneously
 ```
-cd Test/EPIC
+cd test/EPIC
 ls *.tbk
-tbmate view -cd *.tbk |less #or export to a txt file with "> out.txt"
-tbmate view -cd -g cg00013684,cg00029587,rs7746156 *.tbk  #That would be very useful to query a given probes from many .tbk files.
+tbmate view -cd *.tbk |less 
+tbmate view -cd -g cg00013684,cg00029587,rs7746156 *.tbk  
+#That would be very useful to query a given probes from many .tbk files.
+
+#Similarly, we can also query EPIC data by chromosome and posotion other than probe ID.
+tbmate view -acd -i EPIC_to_hg38.idx.gz -g chr20:31691842-31701844 *.tbk
 ```
 
-### The tbk files
+### **4. The tbk files**
 
 tbk file is a binary file. The first three bytes have to be "tbk" and will be validated by tbmate. The first 512 bytes store the data header:
 
@@ -266,10 +272,20 @@ tbmate header input.tbk
 
 The header subcommand will output the header inforamtion
 
+
+### **5. An example of packing and viewing CHIP-Seq dataset**
+```
+cd test/CHIP
+cut -f 1-4 example.bed |sort -k1V -k2n -k3n |awk 'BEGIN {OFS="\t";} {print $1,$2,$3,NR-1,$4}' | bgzip > idx.bed.gz
+tabix -b 2 -e 3 idx.bed.gz
+cut -f 1-3,5 example.bed |tbmate pack -m "idx.bed.gz" - example.tbk
+tbmate view -a -c -g chr15:103315118-103323750 example.tbk
+```
+
 ## Demo
 [https://github.com/zhou-lab/tbmate/blob/master/test/README.md](https://github.com/zhou-lab/tbmate/blob/master/test/README.md)
 
-## "Column-wise operation" by file selection.
+### "Column-wise operation" by file selection.
 
 Each sample is stored in a file. Data sets can be easily assembled by selecting files.
 
@@ -281,7 +297,7 @@ Here is another example of Whole Genome Bisulfite Sequencing Data, stored and ac
 
 ![random access2](docs/clip2.gif)
 
-## Virtual coordinate switch without copying data.
+### Virtual coordinate switch without copying data.
 
 It is cumbersome to keep another copy of data after changing genome assembly. This can be even more storage consuming when one need to re-format array data to be co-analyzed by genome-wide data. tbmate can read a re-arranged address file so that data is used under the new coordinate system withot actual data re-storage. For example, one can use array data with a genomic coordinate so that it is used as a whole genome data. 
 

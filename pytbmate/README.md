@@ -47,7 +47,7 @@ python setup.py install
 ```
 
 ## **Usage**
-**1. Building tabix index.**
+### **1. Building tabix index.**
 </br>
 Download HM450 array manifest file and index it with tabix
 ```
@@ -78,10 +78,16 @@ Simple query with tabix:
 tabix hm450_idx.bed.gz cg18478105:1-2
 ```
 
+Generating index for WGBS cpg sites:
+```
+zcat cpg_noDecoy.bed.gz | sort -k1V -k2n -k3n | awk 'BEGIN {OFS="\t"} {print($0,NR-1)}' | bgzip > idx.gz
+tabix -s 1 -b 2 -e 3 -0 idx.gz
+```
+
 Similarly, a EPIC manifest file can be downloaded from [here](http://webdata.illumina.com.s3-website-us-east-1.amazonaws.com/downloads/productfiles/methylationEPIC/infinium-methylationepic-v5-manifest-file-csv.zip). To save time, we provided the index files and tabix index for EPIC and WGBS in [test dataset](https://).
 
 
-**2. Packing data into .tbk files.**
+### **2. Packing data into .tbk files.**
 
 - (1). Packing Hm450 array data.
 ```
@@ -145,7 +151,7 @@ ls -sh TCGA_BLCA_A13J*
 256M TCGA_BLCA_A13J_cpg.gz  127M TCGA_BLCA_A13J.tbk
 ```
 
-**3. Query .tbk files.**
+### **3. Query .tbk files.**
 ```
 cd Test/EPIC
 ```
@@ -157,10 +163,85 @@ idx_file='idx.gz'
 tbmate.Query(tbk_file=tbk_file,seqname="cg27587195",idx=idx_file,dtype='float')
 ```
 
-Query probe cg27587195 from multiple .tbk file. If you have many sampels to query, QueryMultiSamples maybe useful.
+Query probe cg27587195 from multiple .tbk file. If you have many sampels to query, QueryOneSiteInSamples maybe useful.
 ```
 import tbmate
-tbk_files=[file for file in os.listdir("./") if file.endswith('.tbk')]
-idx_file='idx.gz'
-tbmate.QueryMultiSamples(tbk_files=tbk_files,seqname='cg27587195',idx=idx_file,dtype='float')
+idx="/mnt/isilon/zhou_lab/projects/20191221_references/hg38/annotation/cpg/idx.gz"
+tbk_dir="/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg38"
+
+tbmate view -abcd -i ${idx} ${tbk_dir}/Ziller_adult_sorted_CD8_330_draw_UW_RO_01736.tbk |les
+
+df_cpg=pd.read_csv(idx,sep='\t',header=None,names=['chr','start','end','idx'],nrows=1000)
+tbk_files=[os.path.join(tbk_dir,name) for name in os.listdir(tbk_dir)]
+    
+r=tbmate.QueryOneSiteInSamples(tbk_files=tbk_files[:10],seqname='chr1',start=10483,end=10485,idx=idx)
+
+```
+
+#Query one cpg site from 390 .tbk files
+```
+import os
+import tbmate
+
+seqname,start,end=['chr1',10483,10485]
+tbk_files=['/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19/'+name for name in os.listdir('/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19') if name.endswith('.tbk')]
+idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
+time data=tbmate.QueryOneSiteInSamples(tbk_files,seqname,start,end,idx)
+#It takes only 1.5 second.
+```
+
+#Query multiple cpg sites from 390 .tbk files. 
+#For example, if you want to query 3 cpgs from many .tbk files, Using QueryMultiSitesInSamples function would be faster than run QueryOneSiteInSamples for 3 times.
+```
+idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
+tbk_files=['/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19/'+name for name in os.listdir('/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg19') if name.endswith('.tbk')]
+coordinates=[['chr1',10483,10485],['chr2',11380,11382],['chr22',16085342,16085344]]
+idx='/mnt/isilon/zhou_lab/projects/20191221_references/hg19/annotation/cpg/idx.gz'
+time data=tbmate.QueryMultiSitesInSamples(tbk_files,coordinates,idx)
+```
+#Output: A pandas dataframe, v1 is the methylation beta value and v2 is depth (if there was additional column), -1 is missing values (should be taken care by youself).
+
+```
+  seqname  start    end                                             sample        v1    v2
+0    chr1  10483  10485       Ziller_adult_sorted_CD8_330_draw_UW_RO_01736  0.843750  32.0
+1    chr1  10483  10485    BP_venous_blood_S0039051_macrophage_DiseaseFree -1.000000   0.0
+2    chr1  10483  10485                                      TCGA_GBM_1460  0.692308  13.0
+3    chr1  10483  10485                                REMC_E079_Esophagus  0.900000  40.0
+4    chr1  10483  10485  BP_venous_blood_C000S5A1bs_CD14positive_CD16ne...  0.812500  16.0
+```
+
+#Query by index
+Example 1
+ipython
+```
+import tbmate
+idx="/mnt/isilon/zhou_lab/projects/20191221_references/hg38/annotation/cpg/idx.gz"
+tbk_dir="/mnt/isilon/zhou_lab/projects/20200106_human_WGBS/tbk_hg38"
+
+#tbmate view -abcd -i ${idx} ${tbk_dir}/Ziller_adult_sorted_CD8_330_draw_UW_RO_01736.tbk |les
+#you can use the above command to view the .tbk file.
+
+df_cpg=pd.read_csv(idx,sep='\t',header=None,names=['chr','start','end','idx'],nrows=1000)
+tbk_files=[os.path.join(tbk_dir,name) for name in os.listdir(tbk_dir)]
+    
+time R=tbmate.QueryByIndex(Index=df_cpg.idx.tolist(),tbk_files=tbk_files,fmt='fi')
+```
+
+#Example 2
+```ipython
+import tbmate
+import pandas as pd
+import os,sys
+tbk_dir="~/projects/20191212_GEO_datasets/tbks"
+idx = '/mnt/isilon/zhou_lab/projects/20191221_references/InfiniumArray/EPIC/EPIC.idx.gz'
+tbk_files=[os.path.join(tbk_dir,file) for file in os.listdir(tbk_dir) if file.endswith('.tbk')]
+df_idx=pd.read_csv(idx,header=None,names=['chr','start','end','idx'],sep='\t')
+R=tbmate.QueryByIndex(Index=df_cpg.idx.tolist(),tbk_files=tbk_files,fmt='fi')
+
+time R=tbmate.QueryByIndex(Index=[0,1,24989],tbk_files=tbk_files,fmt='fi')
+#Read 3 probes from all tbk_files, only take 1.74 second
+
+time R=tbmate.QueryByIndex(Index=df_idx.idx.tolist(),tbk_files=tbk_files,fmt='fi')
+#Read all probes from all tbk_files.
+
 ```
