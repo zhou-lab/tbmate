@@ -396,7 +396,7 @@ def QueryByIndex(Index=None,tbk_files=None,fmt='fi'):
     """
     total_size=struct.calcsize(fmt)
     single_size=4
-    data=pd.DataFrame(Index,columns='idx')
+    data=pd.DataFrame(Index,columns=['idx'])
     depth=data.copy()
     for tbk_file in tbk_files:
         print(tbk_file)
